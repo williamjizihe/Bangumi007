@@ -3,6 +3,7 @@
 
 /log
 /data/database
+/data/config
 
 *.log
 *.db

@@ -1,13 +1,11 @@
 use std::collections::HashSet;
-use std::error::Error;
 use std::fmt::Debug;
 use roxmltree::Document;
 use reqwest::blocking::get;
 use html_escape::decode_html_entities;
 use fancy_regex::Regex;
 use retry::delay::Fixed;
-use rusqlite::Connection;
-use crate::utils::rss_cache::{init_database, insert_item, find_items_not_in_db, fetch_info_by_db};
+use crate::utils::rss_cache::{insert_item, find_items_not_in_db, fetch_info_by_db};
 use retry::retry;
 use crate::utils::rss_parser::ParseError::CustomError;
 
@@ -25,6 +23,7 @@ pub struct MikanItem {
     pub codec: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub enum ParseError {
     ReqwestError(reqwest::Error),
@@ -83,7 +82,7 @@ fn parse_language(title: &str) -> String {
     result
 }
 
-pub fn parse_rss(url: &str, conn: &Connection) -> Result<Vec<MikanItem>, ParseError> {
+pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
     // RSS parser
     // Get the RSS feed from the URL and parse it with roxmltree.
     // First read channel title and link
@@ -159,7 +158,7 @@ pub fn parse_rss(url: &str, conn: &Connection) -> Result<Vec<MikanItem>, ParseEr
     // Find the items in database, get the list of items not in database
     // For each item not in database, parse the episode information
     // Then insert the item into the database
-    let items_not_in_db = find_items_not_in_db(conn, &result);
+    let items_not_in_db = find_items_not_in_db(&result);
     for item in items_not_in_db {
         let item = retry(Fixed::from_millis(5000), || {
             match parse_episode(&item) {
@@ -170,13 +169,13 @@ pub fn parse_rss(url: &str, conn: &Connection) -> Result<Vec<MikanItem>, ParseEr
                 }
             }
         }).unwrap();
-        insert_item(conn, &item).unwrap();
+        insert_item(&item).unwrap();
     }
-    let items_full = fetch_info_by_db(conn, &result);
+    let items_full = fetch_info_by_db(&result);
     Ok(items_full)
 }
 
-pub fn expand_rss(mut items: Vec<MikanItem>, conn: &Connection) -> Vec<MikanItem> {
+pub fn expand_rss(items: Vec<MikanItem>) -> Vec<MikanItem> {
     // Expand the RSS and get history episodes
     // For each item in items, get its bangumi id and subgroup id
     // Then visit https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}
@@ -189,7 +188,7 @@ pub fn expand_rss(mut items: Vec<MikanItem>, conn: &Connection) -> Vec<MikanItem
             continue;
         }
         let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", item.mikan_bangumi_id, item.mikan_subgroup_id);
-        let items_full = parse_rss(&url, &conn).unwrap();
+        let items_full = parse_rss(&url).unwrap();
         // Add to the result
         for item in items_full {
             result.push(item);
@@ -317,9 +316,8 @@ mod tests {
 
     #[test]
     fn test_parse_rss() {
-        let conn = init_database().unwrap();
-        let url = "https://mikanani.me/RSS/MyBangumi?token=";   // TODO: token config secret
-        let items = parse_rss(url, &conn);
+        let url = "https://mikanani.me/RSS/Bangumi?bangumiId=3305&subgroupid=382";   // TODO: token config secret
+        let items = parse_rss(url).unwrap();
         for item in items {
             println!("{:?}", item);
         }

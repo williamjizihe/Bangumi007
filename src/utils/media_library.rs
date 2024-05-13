@@ -1,7 +1,31 @@
 use std::collections::HashSet;
+use std::sync::RwLock;
 use rusqlite::{Connection};
 use crate::utils::rss_parser::MikanItem;
 use crate::utils::rss_parser;
+
+use lazy_static::lazy_static;
+
+#[derive(Debug)]
+struct InitedDb {
+    inited: bool,
+}
+
+impl InitedDb {
+    fn new() -> InitedDb {
+        InitedDb {
+            inited: false,
+        }
+    }
+
+    fn set_inited(&mut self) {
+        self.inited = true;
+    }
+}
+
+lazy_static! {
+    static ref INITED_DB: RwLock<InitedDb> = RwLock::new(InitedDb::new());
+}
 
 #[derive(Debug, Clone)]
 pub struct AnimeSeason {
@@ -28,7 +52,7 @@ pub struct AnimeSeasonItem {
     pub codec: String,
 }
 
-pub fn init_database() -> rusqlite::Result<Connection> {
+pub fn init_database() -> rusqlite::Result<()> {
     let conn = Connection::open("data/database/media_library.db")?;
 
     conn.execute(
@@ -62,10 +86,20 @@ pub fn init_database() -> rusqlite::Result<Connection> {
         [],
     )?;
 
+    INITED_DB.write().unwrap().set_inited();
+    Ok(())
+}
+
+pub(crate) fn get_db_conn() -> rusqlite::Result<Connection> {
+    if !INITED_DB.read().unwrap().inited {
+        init_database()?;
+    }
+    let conn = Connection::open("data/database/media_library.db")?;
     Ok(conn)
 }
 
-pub fn read_season_info(mikan_bgm_id: i32, mikan_sub_id: i32, conn: &Connection) -> Option<AnimeSeason> {
+pub fn read_season_info(mikan_bgm_id: i32, mikan_sub_id: i32) -> Option<AnimeSeason> {
+    let conn = get_db_conn().unwrap();
     let mut stmt = conn.prepare("select * from anime_season where mikan_bangumi_id = ?1 and mikan_subgroup_id = ?2").unwrap();
     let season_iter = stmt.query_map(&[&mikan_bgm_id, &mikan_sub_id], |row| {
         Ok(AnimeSeason {
@@ -85,7 +119,8 @@ pub fn read_season_info(mikan_bgm_id: i32, mikan_sub_id: i32, conn: &Connection)
     None
 }
 
-pub fn create_season(season: &AnimeSeason, conn: &Connection) {
+pub fn create_season(season: &AnimeSeason) {
+    let conn = get_db_conn().unwrap();
     conn.execute(
         "insert or replace into anime_season (
             mikan_bangumi_id,
@@ -106,8 +141,9 @@ pub fn create_season(season: &AnimeSeason, conn: &Connection) {
     ).unwrap();
 }
 
-pub fn create_item(item: &MikanItem, conn: &Connection) {
-    let season = read_season_info(item.mikan_bangumi_id, item.mikan_subgroup_id, conn).unwrap();
+pub fn create_item(item: &MikanItem) {
+    let conn = get_db_conn().unwrap();
+    let season = read_season_info(item.mikan_bangumi_id, item.mikan_subgroup_id).unwrap();
     let episode_num_offseted = item.episode_num + season.episode_offset;
 
     conn.execute(
@@ -140,18 +176,18 @@ pub fn create_item(item: &MikanItem, conn: &Connection) {
     ).unwrap();
 }
 
-pub fn update_library(items: &Vec<MikanItem>, conn: &Connection) {
+pub fn update_library(items: &Vec<MikanItem>) {
     // For each item in the fetched updating list,
     // Match the item with the corresponding anime season
     // If the season is not found, insert the season into the database
 
     for item in items {
         // If the season is not found, insert the season into the database
-        if let Some(season) = read_season_info(item.mikan_bangumi_id, item.mikan_subgroup_id, conn) {
+        if let Some(season) = read_season_info(item.mikan_bangumi_id, item.mikan_subgroup_id) {
             // If the season is found, insert the item into the database if the item obeys the language and codec restriction
             if season.language == "" || season.language == item.language {
                 if season.codec == "" || season.codec == item.codec {
-                    create_item(&item, conn);
+                    create_item(&item);
                 }
             }
         } else {
@@ -164,27 +200,31 @@ pub fn update_library(items: &Vec<MikanItem>, conn: &Connection) {
                 codec: "".to_string(),
                 episode_offset: 0,
             };
-            create_season(&season, conn);
-            create_item(&item, conn);
+            create_season(&season);
+            create_item(&item);
         }
     }
 }
 
-pub fn delete_item(item_uuid: &str, conn: &Connection) {
+pub fn delete_item(item_uuid: &str) {
+    let conn = get_db_conn().unwrap();
     conn.execute(
         "delete from anime_season_item where mikan_item_uuid = ?1",
         &[item_uuid],
     ).unwrap();
 }
 
-pub fn delete_season(mikan_bgm_id: i32, mikan_sub_id: i32, conn: &Connection) {
+#[allow(dead_code)]
+pub fn delete_season(mikan_bgm_id: i32, mikan_sub_id: i32) {
+    let conn = get_db_conn().unwrap();
     conn.execute(
         "delete from anime_season where mikan_bangumi_id = ?1 and mikan_subgroup_id = ?2",
         &[&mikan_bgm_id, &mikan_sub_id],
     ).unwrap();
 }
 
-pub fn read_season_items(mikan_bgm_id: i32, mikan_sub_id: i32, conn: &Connection) -> Vec<AnimeSeasonItem> {
+pub fn read_season_items(mikan_bgm_id: i32, mikan_sub_id: i32) -> Vec<AnimeSeasonItem> {
+    let conn = get_db_conn().unwrap();
     let mut stmt = conn.prepare("select * from anime_season_item where mikan_bangumi_id = ?1 and mikan_subgroup_id = ?2").unwrap();
     let item_iter = stmt.query_map(&[&mikan_bgm_id, &mikan_sub_id], |row| {
         Ok(AnimeSeasonItem {
@@ -210,7 +250,8 @@ pub fn read_season_items(mikan_bgm_id: i32, mikan_sub_id: i32, conn: &Connection
     items
 }
 
-pub fn read_seasons(conn: &Connection) -> Vec<AnimeSeason> {
+pub fn read_seasons() -> Vec<AnimeSeason> {
+    let conn = get_db_conn().unwrap();
     let mut stmt = conn.prepare("select * from anime_season").unwrap();
     let season_iter = stmt.query_map([], |row| {
         Ok(AnimeSeason {
@@ -231,11 +272,11 @@ pub fn read_seasons(conn: &Connection) -> Vec<AnimeSeason> {
     seasons
 }
 
-pub fn auto_season_config_clean(conn: &Connection) {
-    let seasons = read_seasons(conn);
+pub fn auto_season_config_clean() {
+    let seasons = read_seasons();
     for season in seasons {
         // get episode list, add (language, codec) pair config to candidates
-        let items = read_season_items(season.mikan_bangumi_id, season.mikan_subgroup_id, conn);
+        let items = read_season_items(season.mikan_bangumi_id, season.mikan_subgroup_id);
         let mut conf_candidates = HashSet::new();
         for item in items {
             conf_candidates.insert((item.language.clone(), item.codec.clone()));
@@ -266,13 +307,14 @@ pub fn auto_season_config_clean(conn: &Connection) {
             language: best_conf.0,
             codec: best_conf.1,
             episode_offset: season.episode_offset,
-        }, conn,
+        },
         true,
         false);
     }
 }
 
-pub fn update_season_config(season: &AnimeSeason, conn: &Connection, delete_items: bool, fetch_items: bool) {
+pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_items: bool) {
+    let conn = get_db_conn().unwrap();
 
     conn.execute(
         "update anime_season set language = ?1, codec = ?2, episode_offset = ?3 where mikan_bangumi_id = ?4 and mikan_subgroup_id = ?5",
@@ -287,12 +329,12 @@ pub fn update_season_config(season: &AnimeSeason, conn: &Connection, delete_item
 
     // delete items that do not obey the language and codec restriction
     if delete_items {
-        let items = read_season_items(season.mikan_bangumi_id, season.mikan_subgroup_id, conn);
+        let items = read_season_items(season.mikan_bangumi_id, season.mikan_subgroup_id);
         for item in items {
             if season.language != "" && season.language != item.language {
-                delete_item(&item.mikan_item_uuid, conn);
+                delete_item(&item.mikan_item_uuid);
             } else if season.codec != "" && season.codec != item.codec {
-                delete_item(&item.mikan_item_uuid, conn);
+                delete_item(&item.mikan_item_uuid);
             }
         }
     }
@@ -300,8 +342,8 @@ pub fn update_season_config(season: &AnimeSeason, conn: &Connection, delete_item
     // fetch items from the rss feed
     if fetch_items {
         let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", season.mikan_bangumi_id, season.mikan_subgroup_id);
-        let items = rss_parser::parse_rss(&url, conn).unwrap();
-        let items = rss_parser::expand_rss(items, conn);
-        update_library(&items, conn);
+        let items = rss_parser::parse_rss(&url).unwrap();
+        let items = rss_parser::expand_rss(items);
+        update_library(&items);
     }
 }

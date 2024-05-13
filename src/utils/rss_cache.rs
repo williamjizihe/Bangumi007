@@ -1,7 +1,31 @@
+use std::sync::RwLock;
 use rusqlite::{Connection, Result};
 use crate::utils::rss_parser::MikanItem;
+use lazy_static::lazy_static;
 
-pub fn init_database() -> Result<Connection> {
+#[derive(Debug)]
+struct InitedDb {
+    inited: bool,
+}
+
+impl InitedDb {
+    fn new() -> InitedDb {
+        InitedDb {
+            inited: false,
+        }
+    }
+
+    fn set_inited(&mut self) {
+        self.inited = true;
+    }
+}
+
+lazy_static! {
+    static ref INITED_DB: RwLock<InitedDb> = RwLock::new(InitedDb::new());
+}
+
+
+pub fn init_database() -> Result<()> {
     let conn = Connection::open("data/database/rss_cache.db")?;
 
     conn.execute(
@@ -19,14 +43,22 @@ pub fn init_database() -> Result<Connection> {
         )",
         [],
     )?;
+    INITED_DB.write().unwrap().set_inited();
+    Ok(())
+}
 
+fn get_db_conn() -> Result<Connection> {
+    if !INITED_DB.read().unwrap().inited {
+        init_database()?;
+    }
+    let conn = Connection::open("data/database/rss_cache.db")?;
     Ok(conn)
 }
 
 pub(crate) fn insert_item(
-    conn: &Connection,
     item: &MikanItem,
 ) -> Result<()> {
+    let conn = get_db_conn()?;
     let MikanItem {
         mikan_item_uuid,
         mikan_bangumi_id,
@@ -69,21 +101,23 @@ pub(crate) fn insert_item(
     Ok(())
 }
 
-pub(crate) fn find_items_not_in_db(conn: &Connection, items: &Vec<MikanItem>) -> Vec<MikanItem> {
+pub(crate) fn find_items_not_in_db(items: &Vec<MikanItem>) -> Vec<MikanItem> {
+    let conn = get_db_conn().unwrap();
     let mut result: Vec<MikanItem> = Vec::new();
     for item in items {
         let mut stmt = conn.prepare("select mikan_item_uuid from mikan_item where mikan_item_uuid = ?1").unwrap();
         let mut rows = stmt.query(&[&item.mikan_item_uuid]).unwrap();
         match rows.next() {
-            Ok(Some(_)) => {}, // If there is a row, do nothing
+            Ok(Some(_)) => {} // If there is a row, do nothing
             Ok(None) => result.push(item.clone()), // If there is no row, push the item
-            Err(_) => {}, // If there is an error, do nothing (or handle the error as needed)
+            Err(_) => {} // If there is an error, do nothing (or handle the error as needed)
         }
     }
     result
 }
 
-pub fn fetch_info_by_db(conn: &Connection, items: &Vec<MikanItem>) -> Vec<MikanItem> {
+pub fn fetch_info_by_db(items: &Vec<MikanItem>) -> Vec<MikanItem> {
+    let conn = get_db_conn().unwrap();
     let mut result: Vec<MikanItem> = Vec::new();
     for item in items {
         let mut stmt = conn.prepare("select * from mikan_item where mikan_item_uuid = ?1").unwrap();
@@ -112,9 +146,9 @@ pub fn fetch_info_by_db(conn: &Connection, items: &Vec<MikanItem>) -> Vec<MikanI
                     language,
                     codec,
                 });
-            },
-            Ok(None) => {}, // If there is no row, do nothing
-            Err(_) => {}, // If there is an error, do nothing (or handle the error as needed)
+            }
+            Ok(None) => {} // If there is no row, do nothing
+            Err(_) => {} // If there is an error, do nothing (or handle the error as needed)
         }
     }
     result
