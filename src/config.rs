@@ -6,10 +6,31 @@ use lazy_static::lazy_static;
 //     ConfigError(String),
 // }
 
+lazy_static! {
+    pub static ref CONFIG: RwLock<AppConfig> = RwLock::new(AppConfig::load());
+}
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct AppConfig {
+    pub first_run: bool,
     pub rss_config: RSSConfig,
     pub log_config: LogConfig,
+    pub downloader_config: DownloaderConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DownloaderConfig {
+    pub host: String,
+    pub port: i64,
+    pub username: String,
+    pub password: String,
+    pub ttl: i64,
+    pub download_dir: String,
+    pub category: String,
+    pub tags: String,
+    pub paused_after_add: bool,
+    pub sequential_download: bool,
+    pub first_last_piece_prio: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -43,9 +64,24 @@ impl AppConfig {
             log_file: "data/log/bangumi007.log".to_string(),
             log_console: true,
         };
+        let downloader_config = DownloaderConfig {
+            host: "localhost".to_string(),
+            port: 8080,
+            username: "admin".to_string(),
+            password: "password".to_string(),
+            ttl: 1800,
+            download_dir: "".to_string(),
+            category: "".to_string(),
+            tags: "Bangumi007".to_string(),
+            paused_after_add: false,
+            sequential_download: true,
+            first_last_piece_prio: true,
+        };
         AppConfig {
+            first_run: true,
             rss_config,
             log_config,
+            downloader_config,
         }
     }
 
@@ -57,6 +93,9 @@ impl AppConfig {
             Err(_) => {
                 let default_config = AppConfig::default();
                 std::fs::write("data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
+                if default_config.first_run {
+                    panic!("Please manually configure the app_config.toml file");        // TODO: GUI first run setup
+                }
                 default_config
             }
             Ok(content) => {
@@ -65,7 +104,8 @@ impl AppConfig {
                     std::fs::rename("data/config/app_config.toml", &backup_file).unwrap();
                     let default_config = AppConfig::default();
                     std::fs::write("data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
-                    default_config
+                    panic!("Please manually configure the app_config.toml file");        // TODO: GUI first run setup
+                    // default_config
                 })
             }
         }
@@ -81,10 +121,6 @@ impl AppConfig {
         let default_config = AppConfig::default();
         std::fs::write("data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
     }
-}
-
-lazy_static! {
-    pub static ref CONFIG: RwLock<AppConfig> = RwLock::new(AppConfig::load());
 }
 
 #[cfg(test)]

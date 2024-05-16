@@ -82,6 +82,8 @@ fn parse_language(title: &str) -> String {
     result
 }
 
+// TODO: exclude \d+-\d from title
+
 pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
     // RSS parser
     // Get the RSS feed from the URL and parse it with roxmltree.
@@ -316,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_parse_rss() {
-        let url = "https://mikanani.me/RSS/Bangumi?bangumiId=3305&subgroupid=382";   // TODO: token config secret
+        let url = "https://mikanani.me/RSS/Bangumi?bangumiId=3305&subgroupid=382";
         let items = parse_rss(url).unwrap();
         for item in items {
             println!("{:?}", item);

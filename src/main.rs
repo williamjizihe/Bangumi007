@@ -1,5 +1,6 @@
-use crate::utils::rss_parser::{parse_rss, expand_rss};
-use crate::utils::media_library::{auto_season_config_clean, read_season_items, read_seasons, update_library};
+use crate::utils::rss_parser::{parse_rss};
+use crate::utils::qbittorrent::{download_items};
+use crate::utils::media_library::{auto_season_config_clean, read_all_items, read_season_items, read_seasons, update_library};
 
 mod config;
 mod utils;
@@ -7,6 +8,7 @@ mod utils;
 fn main() {
     utils::logger::init();
     log::info!("Program started");
+    // Fetch RSS feeds
     let rss_list = config::CONFIG.read().unwrap().rss_config.list.clone();
     for rss in rss_list {
         if rss.active {
@@ -16,7 +18,9 @@ fn main() {
             update_library(&items);
         }
     }
+    // Rearrange the media library
     auto_season_config_clean();
+    // Output media library
     for season in read_seasons() {
         println!("Season: {:?}", season.mikan_bangumi_title);
         print!("Ep: ");
@@ -26,4 +30,7 @@ fn main() {
         }
         println!();
     }
+    // Add torrents to downloader
+    let library_items = read_all_items();
+    download_items(&library_items).unwrap();
 }

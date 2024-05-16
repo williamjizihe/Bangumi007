@@ -272,6 +272,33 @@ pub fn read_seasons() -> Vec<AnimeSeason> {
     seasons
 }
 
+pub fn read_all_items() -> Vec<AnimeSeasonItem> {
+    let conn = get_db_conn().unwrap();
+    let mut stmt = conn.prepare("select * from anime_season_item").unwrap();
+    let item_iter = stmt.query_map([], |row| {
+        Ok(AnimeSeasonItem {
+            mikan_item_uuid: row.get(0)?,
+            mikan_bangumi_id: row.get(1)?,
+            mikan_subgroup_id: row.get(2)?,
+            mikan_bangumi_title: row.get(3)?,
+            mikan_item_title: row.get(4)?,
+            mikan_magnet_link: row.get(5)?,
+            mikan_pub_date: row.get(6)?,
+            episode_num: row.get(7)?,
+            episode_num_offseted: row.get(8)?,
+            language: row.get(9)?,
+            codec: row.get(10)?,
+        })
+    }).unwrap();
+
+    let mut items = Vec::new();
+    for item in item_iter {
+        items.push(item.unwrap());
+    }
+
+    items
+}
+
 pub fn auto_season_config_clean() {
     let seasons = read_seasons();
     for season in seasons {
