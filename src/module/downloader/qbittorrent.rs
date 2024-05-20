@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use reqwest::blocking::{Client, multipart};
 use serde::Deserialize;
 use crate::config::{CONFIG, DownloaderConfig};
-use crate::utils::media_library::AnimeSeasonItem;
+use crate::module::library::AnimeSeasonItem;
 
 #[derive(Debug)]
 struct Downloader {
@@ -356,7 +356,7 @@ fn get_fileinfo(hash: &String) -> Result<Vec<TorrentFile>, Box<dyn Error>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::logger;
+    use crate::module::logger;
     use super::*;
 
     #[test]

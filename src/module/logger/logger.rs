@@ -12,7 +12,7 @@ lazy_static! {
     pub static ref LOG_HANDLE: RwLock<Handle> = RwLock::new(init_logging());
 }
 
-pub fn get_config() -> Config {
+pub fn get_logging_config() -> Config {
     let stdout = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new("{d(%H:%M:%S)} {h({l}):<5.5} [{M}] {m}{n}")))
         .build();
@@ -52,11 +52,12 @@ pub fn get_config() -> Config {
 }
 
 fn init_logging() -> Handle {
-    let handle = log4rs::init_config(get_config()).unwrap();
+    let handle = log4rs::init_config(get_logging_config()).unwrap();
     log::debug!("Log level: {:?}", CONFIG.read().unwrap().log_config.log_level);
     handle
 }
 
+// Should be called at the beginning of the program
 pub fn init() {
     let _a = LOG_HANDLE.read().unwrap();
 }

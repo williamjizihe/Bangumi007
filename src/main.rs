@@ -1,12 +1,12 @@
-use crate::utils::mikan_parser::{parse_rss};
-use crate::utils::qbittorrent::{download_items};
-use crate::utils::media_library::{auto_season_config_clean, read_all_items, read_season_items, read_seasons, update_library};
+use crate::module::parser::mikan_parser::{parse_rss};
+use crate::module::downloader::qbittorrent::{download_items};
+use crate::module::library::{auto_season_config_clean, read_all_items, read_season_items, read_seasons, update_library};
+use crate::module::config;
 
-mod config;
-mod utils;
+mod module;
 
 fn main() {
-    utils::logger::init();
+    module::logger::init();
     log::info!("Program started");
     // Fetch RSS feeds
     let rss_list = config::CONFIG.read().unwrap().rss_config.list.clone();
