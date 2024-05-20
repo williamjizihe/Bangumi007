@@ -1,6 +1,6 @@
 use std::sync::RwLock;
 use rusqlite::{Connection, Result};
-use crate::utils::rss_parser::MikanItem;
+use crate::utils::mikan_parser::MikanItem;
 use lazy_static::lazy_static;
 
 #[derive(Debug)]
@@ -31,12 +31,12 @@ pub fn init_database() -> Result<()> {
     conn.execute(
         "create table if not exists mikan_item (
             mikan_item_uuid text primary key,
-            mikan_bangumi_id integer,
+            mikan_subject_id integer,
             mikan_subgroup_id integer,
-            mikan_bangumi_title text,
+            mikan_subject_title text,
             mikan_item_title text,
-            mikan_magnet_link text,
-            mikan_pub_date text,
+            mikan_item_magnet_link text,
+            mikan_item_pub_date text,
             episode_num integer,
             language text,
             codec text
@@ -61,12 +61,12 @@ pub(crate) fn insert_item(
     let conn = get_db_conn()?;
     let MikanItem {
         mikan_item_uuid,
-        mikan_bangumi_id,
+        mikan_subject_id,
         mikan_subgroup_id,
-        mikan_bangumi_title,
+        mikan_subject_title,
         mikan_item_title,
-        mikan_magnet_link,
-        mikan_pub_date,
+        mikan_item_magnet_link,
+        mikan_item_pub_date,
         episode_num,
         language,
         codec,
@@ -74,24 +74,24 @@ pub(crate) fn insert_item(
     conn.execute(
         "insert or replace into mikan_item (
             mikan_item_uuid,
-            mikan_bangumi_id,
+            mikan_subject_id,
             mikan_subgroup_id,
-            mikan_bangumi_title,
+            mikan_subject_title,
             mikan_item_title,
-            mikan_magnet_link,
-            mikan_pub_date,
+            mikan_item_magnet_link,
+            mikan_item_pub_date,
             episode_num,
             language,
             codec
         ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
         &[
             mikan_item_uuid,
-            &*mikan_bangumi_id.to_string(),
+            &*mikan_subject_id.to_string(),
             &*mikan_subgroup_id.to_string(),
-            mikan_bangumi_title,
+            mikan_subject_title,
             mikan_item_title,
-            mikan_magnet_link,
-            mikan_pub_date,
+            mikan_item_magnet_link,
+            mikan_item_pub_date,
             &*episode_num.to_string(),
             language,
             codec,
@@ -125,23 +125,23 @@ pub fn fetch_info_by_db(items: &Vec<MikanItem>) -> Vec<MikanItem> {
         match rows.next() {
             Ok(Some(row)) => {
                 let mikan_item_uuid: String = row.get(0).unwrap();
-                let mikan_bangumi_id: i32 = row.get(1).unwrap();
+                let mikan_subject_id: i32 = row.get(1).unwrap();
                 let mikan_subgroup_id: i32 = row.get(2).unwrap();
-                let mikan_bangumi_title: String = row.get(3).unwrap();
+                let mikan_subject_title: String = row.get(3).unwrap();
                 let mikan_item_title: String = row.get(4).unwrap();
-                let mikan_magnet_link: String = row.get(5).unwrap();
-                let mikan_pub_date: String = row.get(6).unwrap();
+                let mikan_item_magnet_link: String = row.get(5).unwrap();
+                let mikan_item_pub_date: String = row.get(6).unwrap();
                 let episode_num: i32 = row.get(7).unwrap();
                 let language: String = row.get(8).unwrap();
                 let codec: String = row.get(9).unwrap();
                 result.push(MikanItem {
                     mikan_item_uuid,
-                    mikan_bangumi_id,
+                    mikan_subject_id,
                     mikan_subgroup_id,
-                    mikan_bangumi_title,
+                    mikan_subject_title,
                     mikan_item_title,
-                    mikan_magnet_link,
-                    mikan_pub_date,
+                    mikan_item_magnet_link,
+                    mikan_item_pub_date,
                     episode_num,
                     language,
                     codec,

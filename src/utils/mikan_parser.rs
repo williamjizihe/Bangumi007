@@ -7,20 +7,26 @@ use fancy_regex::Regex;
 use retry::delay::Fixed;
 use crate::utils::rss_cache::{insert_item, find_items_not_in_db, fetch_info_by_db};
 use retry::retry;
-use crate::utils::rss_parser::ParseError::CustomError;
+use crate::utils::mikan_parser::ParseError::CustomError;
 
 #[derive(Debug, Clone)]
 pub struct MikanItem {
     pub mikan_item_uuid: String,
-    pub mikan_bangumi_id: i32,
+    pub mikan_subject_id: i32,
     pub mikan_subgroup_id: i32,
-    pub mikan_bangumi_title: String,
+    pub mikan_subject_title: String,
     pub mikan_item_title: String,
-    pub mikan_magnet_link: String,
-    pub mikan_pub_date: String,
+    pub mikan_item_magnet_link: String,
+    pub mikan_item_pub_date: String,
     pub episode_num: i32,
     pub language: String,
     pub codec: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct MikanSubject {
+    pub mikan_subject_id: i32,
+    pub mikan_subject_bangumi_id: i32,
 }
 
 #[allow(dead_code)]
@@ -84,13 +90,15 @@ fn parse_language(title: &str) -> String {
 
 // TODO: exclude \d+-\d from title
 
+//
 pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
     // RSS parser
     // Get the RSS feed from the URL and parse it with roxmltree.
     // First read channel title and link
     // Then read all the items in the feed channel. and get the title and link of each item.
 
-    //get(url).unwrap().text().unwrap();
+    // Get RSS feed
+    // "get(url).unwrap().text().unwrap();" with retry
     let response = retry(Fixed::from_millis(5000), || {
         match get(url) {
             Ok(response) => {
@@ -107,10 +115,15 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
             }
         }
     }).unwrap();
+
+    // Parse the response DOM
     let dom = Document::parse(&response).unwrap();
+
+    // RSS channel DOM object
     let channel = dom.root().first_element_child().unwrap().first_element_child().unwrap();
-    // print
     log::debug!("Channel Name: {}", channel.tag_name().name());
+
+    // Parse Channel title and RSS link url
     let channel_title = channel
         .children()
         .find(|n| n.has_tag_name("title")).unwrap()
@@ -120,19 +133,27 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
         .find(|n| n.has_tag_name("link")).unwrap()
         .text().unwrap();
     log::debug!("Channel Title: {}, Channel Link: {}", channel_title, channel_link);
+
+    // Parse items
     let items = channel.children().filter(|n| n.has_tag_name("item"));
     let mut result: Vec<MikanItem> = Vec::new();
     for item in items {
+
+        // Item Title
         let title = item
             .children()
             .find(|n| n.has_tag_name("title")).unwrap()
             .text()
             .unwrap();
+
+        // Episode Link (on Mikanani)
         let link = item
             .children()
             .find(|n| n.has_tag_name("link")).unwrap()
             .text()
             .unwrap();
+
+        // Episode Torrent's pubDate
         let torrent = item
             .children()
             .find(|n| n.has_tag_name("torrent")).unwrap();
@@ -141,22 +162,24 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
             .find(|n| n.has_tag_name("pubDate")).unwrap()
             .text()
             .unwrap();
-        // uuid: slice from link
+
+        // Mikan Episode UUID (Torrent/Maglink hash): slice from link
         let uuid = link.rfind('/').unwrap();
         let uuid = &link[uuid + 1..];
         result.push(MikanItem {
-            mikan_item_uuid: uuid.to_string(),
-            mikan_bangumi_id: 0,
+            mikan_item_uuid: uuid.to_string(),          // Item UUID
+            mikan_subject_id: 0,
             mikan_subgroup_id: 0,
-            mikan_bangumi_title: "".to_string(),    // default
-            mikan_item_title: title.to_string(),
-            mikan_magnet_link: "".to_string(),      // default
-            mikan_pub_date: pubdate.to_string(),
-            episode_num: parse_filename_to_episode(&title).unwrap_or(-1),
-            language: parse_language(&title),
-            codec: parse_codec(&title),
+            mikan_subject_title: "".to_string(),
+            mikan_item_title: title.to_string(),        // Item Title
+            mikan_item_magnet_link: "".to_string(),
+            mikan_item_pub_date: pubdate.to_string(),   // Torrent PubDate
+            episode_num: parse_filename_to_episode(&title).unwrap_or(-1),  // Episode Number
+            language: parse_language(&title),           // Language
+            codec: parse_codec(&title),                 // Codec
         });
     }
+
     // Find the items in database, get the list of items not in database
     // For each item not in database, parse the episode information
     // Then insert the item into the database
@@ -186,17 +209,17 @@ pub fn expand_rss(items: Vec<MikanItem>) -> Vec<MikanItem> {
     // HashSet to store visited bgm-sub pairs
     let mut visited = HashSet::new();
     for item in items {
-        if visited.contains(&(item.mikan_bangumi_id, item.mikan_subgroup_id)) {
+        if visited.contains(&(item.mikan_subject_id, item.mikan_subgroup_id)) {
             continue;
         }
-        let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", item.mikan_bangumi_id, item.mikan_subgroup_id);
+        let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", item.mikan_subject_id, item.mikan_subgroup_id);
         let items_full = parse_rss(&url).unwrap();
         // Add to the result
         for item in items_full {
             result.push(item);
         }
         // Add to visited
-        visited.insert((item.mikan_bangumi_id, item.mikan_subgroup_id));
+        visited.insert((item.mikan_subject_id, item.mikan_subgroup_id));
     }
     result
 }
@@ -279,12 +302,12 @@ fn parse_episode(item: &MikanItem) -> Result<MikanItem, ParseError> {
 
     Ok(MikanItem {
         mikan_item_uuid: item.mikan_item_uuid.to_string(),
-        mikan_bangumi_id: bgmid,
+        mikan_subject_id: bgmid,
         mikan_subgroup_id: subgid,
-        mikan_bangumi_title: title.to_string(),
+        mikan_subject_title: title.to_string(),
         mikan_item_title: item.mikan_item_title.to_string(),
-        mikan_magnet_link: magnet.to_string(),
-        mikan_pub_date: item.mikan_pub_date.to_string(),
+        mikan_item_magnet_link: magnet.to_string(),
+        mikan_item_pub_date: item.mikan_item_pub_date.to_string(),
         episode_num: item.episode_num,
         language: item.language.to_string(),
         codec: item.codec.to_string(),

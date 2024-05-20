@@ -149,7 +149,7 @@ fn add_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn std::error::Er
     let config = get_config();
     relogin_if_needed()?;
     // replace \ / : * ? " < > |
-    let title = item.mikan_bangumi_title
+    let title = item.mikan_subject_title
         .replace("\\", "")
         .replace("/", "")
         .replace(":", "")
@@ -162,7 +162,7 @@ fn add_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn std::error::Er
     let savepath = format!("{}/{}", config.download_dir, title);
     let url = format!("http://{}:{}/api/v2/torrents/add", config.host, config.port);
     let form = multipart::Form::new()
-        .text("urls", item.mikan_magnet_link.clone())
+        .text("urls", item.mikan_item_magnet_link.clone())
         .text("savepath", savepath)
         .text("category", config.category)
         .text("tags", config.tags)
@@ -274,7 +274,7 @@ pub fn download_items(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn Error>
     let mut library_hash: HashSet<String> = HashSet::new();
     let mut library_hash_to_item: HashMap<String, AnimeSeasonItem> = HashMap::new();
     for item in items {
-        let hash = item.mikan_magnet_link.split("btih:").last().unwrap();
+        let hash = item.mikan_item_magnet_link.split("btih:").last().unwrap();
         let hash = hash.split("&").next().unwrap();
         library_hash.insert(hash.to_string());
         library_hash_to_item.insert(hash.to_string(), item.clone());
@@ -311,7 +311,7 @@ fn get_fileinfo(hash: &String) -> Result<Vec<TorrentFile>, Box<dyn Error>> {
 // pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn std::error::Error>> {
 //     let config = get_config();
 //     let hash_to_item: HashMap<String, AnimeSeasonItem> = items.iter().map(|x| {
-//         let hash = x.mikan_magnet_link.split("btih:").last().unwrap();
+//         let hash = x.mikan_item_magnet_link.split("btih:").last().unwrap();
 //         let hash = hash.split("&").next().unwrap();
 //         (hash.to_string(), x.clone())
 //     }).collect();
@@ -329,11 +329,11 @@ fn get_fileinfo(hash: &String) -> Result<Vec<TorrentFile>, Box<dyn Error>> {
 //             }
 //             // If not match, rename
 //             let old_path = file.name;
-//             // mikan_bangumi_title SxxExx.xxx
+//             // mikan_subject_title SxxExx.xxx
 //             let new_path = format!(
 //                 // "{} S{:02}E{:02}.{}",
 //                 "{} S01E{:02}.{}",
-//                 item.mikan_bangumi_title,
+//                 item.mikan_subject_title,
 //                 item.episode_num_offseted,
 //                 old_path.split(".").last().unwrap(),
 //             );
