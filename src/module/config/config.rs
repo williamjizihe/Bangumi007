@@ -1,6 +1,7 @@
 use std::sync::RwLock;
-use serde::{Deserialize, Serialize};
+
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 // enum ConfigError {
 //     ConfigError(String),

@@ -1,12 +1,14 @@
 use std::sync::RwLock;
+
+use lazy_static::lazy_static;
 use log4rs;
+use log4rs::{Config, Handle};
 use log4rs::append::console::ConsoleAppender;
 use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger};
 use log4rs::encode::pattern::PatternEncoder;
+
 use crate::config::CONFIG;
-use lazy_static::lazy_static;
-use log4rs::{Config, Handle};
 
 lazy_static! {
     pub static ref LOG_HANDLE: RwLock<Handle> = RwLock::new(init_logging());

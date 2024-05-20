@@ -1,7 +1,7 @@
-use crate::module::parser::mikan_parser::{parse_rss};
-use crate::module::downloader::qbittorrent::{download_items};
-use crate::module::library::{auto_season_config_clean, read_all_items, read_season_items, read_seasons, update_library};
 use crate::module::config;
+use crate::module::downloader::qbittorrent::download_items;
+use crate::module::library::{auto_season_config_clean, read_all_items, read_season_items, read_seasons, update_library};
+use crate::module::parser::mikan_parser::parse_rss;
 
 mod module;
 

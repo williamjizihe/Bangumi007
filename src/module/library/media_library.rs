@@ -1,10 +1,11 @@
 use std::collections::HashSet;
 use std::sync::RwLock;
-use rusqlite::{Connection};
-use crate::module::parser::mikan_parser::MikanItem;
-use crate::module::parser::mikan_parser;
 
 use lazy_static::lazy_static;
+use rusqlite::Connection;
+
+use crate::module::parser::mikan_parser;
+use crate::module::parser::mikan_parser::MikanItem;
 
 #[derive(Debug)]
 struct InitedDb {

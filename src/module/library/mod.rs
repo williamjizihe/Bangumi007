@@ -1,3 +1,4 @@
+pub use media_library::*;
+
 pub mod media_library;
 
-pub use media_library::*;

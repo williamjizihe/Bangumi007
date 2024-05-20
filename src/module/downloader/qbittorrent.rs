@@ -1,9 +1,11 @@
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::RwLock;
+
 use lazy_static::lazy_static;
 use reqwest::blocking::{Client, multipart};
 use serde::Deserialize;
+
 use crate::config::{CONFIG, DownloaderConfig};
 use crate::module::library::AnimeSeasonItem;
 
@@ -357,6 +359,7 @@ fn get_fileinfo(hash: &String) -> Result<Vec<TorrentFile>, Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use crate::module::logger;
+
     use super::*;
 
     #[test]

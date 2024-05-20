@@ -1,17 +1,17 @@
 use std::collections::HashSet;
 use std::fmt::Debug;
-use roxmltree::Document;
-use reqwest::blocking::get;
-use html_escape::decode_html_entities;
+use std::sync::RwLock;
+
 use fancy_regex::Regex;
+use html_escape::decode_html_entities;
+use lazy_static::lazy_static;
+use reqwest::blocking::get;
 use retry::delay::Fixed;
 use retry::retry;
-use crate::module::parser::mikan_parser::ParseError::CustomError;
-
-use std::sync::RwLock;
+use roxmltree::Document;
 use rusqlite::{Connection, Result};
-use lazy_static::lazy_static;
 
+use crate::module::parser::mikan_parser::ParseError::CustomError;
 
 #[derive(Debug)]
 struct InitedDb {
