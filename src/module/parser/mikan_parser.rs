@@ -1,200 +1,19 @@
 use std::collections::HashSet;
-use std::fmt::Debug;
-use std::sync::RwLock;
+use std::error::Error;
 
 use fancy_regex::Regex;
 use html_escape::decode_html_entities;
-use lazy_static::lazy_static;
 use reqwest::blocking::get;
 use retry::delay::Fixed;
 use retry::retry;
 use roxmltree::Document;
-use rusqlite::{Connection, Result};
+use rusqlite::Result;
 
-use crate::module::parser::mikan_parser::ParseError::CustomError;
+use cache::rss_mikan::{fetch_cached_items, filter_uncached_items, insert_item_to_cache};
 
-#[derive(Debug)]
-struct InitedDb {
-    inited: bool,
-}
-
-impl InitedDb {
-    fn new() -> InitedDb {
-        InitedDb {
-            inited: false,
-        }
-    }
-
-    fn set_inited(&mut self) {
-        self.inited = true;
-    }
-}
-
-lazy_static! {
-    static ref INITED_DB: RwLock<InitedDb> = RwLock::new(InitedDb::new());
-}
-
-
-
-pub fn init_database() -> Result<()> {
-    let conn = Connection::open("data/database/rss_cache.db")?;
-
-    conn.execute(
-        "create table if not exists mikan_item (
-            mikan_item_uuid text primary key,
-            mikan_subject_id integer,
-            mikan_subgroup_id integer,
-            mikan_subject_title text,
-            mikan_item_title text,
-            mikan_item_magnet_link text,
-            mikan_item_pub_date text,
-            episode_num integer,
-            language text,
-            codec text
-        )",
-        [],
-    )?;
-    INITED_DB.write().unwrap().set_inited();
-    Ok(())
-}
-
-fn get_db_conn() -> Result<Connection> {
-    if !INITED_DB.read().unwrap().inited {
-        init_database()?;
-    }
-    let conn = Connection::open("data/database/rss_cache.db")?;
-    Ok(conn)
-}
-
-pub(crate) fn insert_item(
-    item: &MikanItem,
-) -> Result<()> {
-    let conn = get_db_conn()?;
-    let MikanItem {
-        mikan_item_uuid,
-        mikan_subject_id,
-        mikan_subgroup_id,
-        mikan_subject_title,
-        mikan_item_title,
-        mikan_item_magnet_link,
-        mikan_item_pub_date,
-        episode_num,
-        language,
-        codec,
-    } = item;
-    conn.execute(
-        "insert or replace into mikan_item (
-            mikan_item_uuid,
-            mikan_subject_id,
-            mikan_subgroup_id,
-            mikan_subject_title,
-            mikan_item_title,
-            mikan_item_magnet_link,
-            mikan_item_pub_date,
-            episode_num,
-            language,
-            codec
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
-        &[
-            mikan_item_uuid,
-            &*mikan_subject_id.to_string(),
-            &*mikan_subgroup_id.to_string(),
-            mikan_subject_title,
-            mikan_item_title,
-            mikan_item_magnet_link,
-            mikan_item_pub_date,
-            &*episode_num.to_string(),
-            language,
-            codec,
-        ],
-    )?;
-
-    Ok(())
-}
-
-pub(crate) fn find_items_not_in_db(items: &Vec<MikanItem>) -> Vec<MikanItem> {
-    let conn = get_db_conn().unwrap();
-    let mut result: Vec<MikanItem> = Vec::new();
-    for item in items {
-        let mut stmt = conn.prepare("select mikan_item_uuid from mikan_item where mikan_item_uuid = ?1").unwrap();
-        let mut rows = stmt.query(&[&item.mikan_item_uuid]).unwrap();
-        match rows.next() {
-            Ok(Some(_)) => {} // If there is a row, do nothing
-            Ok(None) => result.push(item.clone()), // If there is no row, push the item
-            Err(_) => {} // If there is an error, do nothing (or handle the error as needed)
-        }
-    }
-    result
-}
-
-pub fn fetch_info_by_db(items: &Vec<MikanItem>) -> Vec<MikanItem> {
-    let conn = get_db_conn().unwrap();
-    let mut result: Vec<MikanItem> = Vec::new();
-    for item in items {
-        let mut stmt = conn.prepare("select * from mikan_item where mikan_item_uuid = ?1").unwrap();
-        let mut rows = stmt.query(&[&item.mikan_item_uuid]).unwrap();
-        match rows.next() {
-            Ok(Some(row)) => {
-                let mikan_item_uuid: String = row.get(0).unwrap();
-                let mikan_subject_id: i32 = row.get(1).unwrap();
-                let mikan_subgroup_id: i32 = row.get(2).unwrap();
-                let mikan_subject_title: String = row.get(3).unwrap();
-                let mikan_item_title: String = row.get(4).unwrap();
-                let mikan_item_magnet_link: String = row.get(5).unwrap();
-                let mikan_item_pub_date: String = row.get(6).unwrap();
-                let episode_num: i32 = row.get(7).unwrap();
-                let language: String = row.get(8).unwrap();
-                let codec: String = row.get(9).unwrap();
-                result.push(MikanItem {
-                    mikan_item_uuid,
-                    mikan_subject_id,
-                    mikan_subgroup_id,
-                    mikan_subject_title,
-                    mikan_item_title,
-                    mikan_item_magnet_link,
-                    mikan_item_pub_date,
-                    episode_num,
-                    language,
-                    codec,
-                });
-            }
-            Ok(None) => {} // If there is no row, do nothing
-            Err(_) => {} // If there is an error, do nothing (or handle the error as needed)
-        }
-    }
-    result
-}
-
-
-#[derive(Debug, Clone)]
-pub struct MikanItem {
-    pub mikan_item_uuid: String,
-    pub mikan_subject_id: i32,
-    pub mikan_subgroup_id: i32,
-    pub mikan_subject_title: String,
-    pub mikan_item_title: String,
-    pub mikan_item_magnet_link: String,
-    pub mikan_item_pub_date: String,
-    pub episode_num: i32,
-    pub language: String,
-    pub codec: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct MikanSubject {
-    pub mikan_subject_id: i32,
-    pub mikan_subject_bangumi_id: i32,
-}
-
-#[allow(dead_code)]
-#[derive(Debug)]
-pub enum ParseError {
-    ReqwestError(reqwest::Error),
-    RoxmltreeError(roxmltree::Error),
-    RegexError(fancy_regex::Error),
-    RusqliteError(rusqlite::Error),
-    CustomError(String),
-}
+use crate::module::database::cache;
+use crate::module::database::cache::rss_mikan::MikanItem;
+use crate::module::utils::error::new_err;
 
 fn parse_codec(title: &str) -> String {
     // avc: H.264 AVC MP4
@@ -247,8 +66,8 @@ fn parse_language(title: &str) -> String {
 
 // TODO: exclude \d+-\d from title
 
-//
-pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
+///
+pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
     // RSS parser
     // Get the RSS feed from the URL and parse it with roxmltree.
     // First read channel title and link
@@ -262,13 +81,13 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
                 if response.status().is_success() {
                     Ok(response.text().unwrap())
                 } else {
-                    log::warn!("Failed to get rss, status code is not 200");
-                    Err(CustomError("Failed to get rss, status code is not 200".to_string()))
+                    log::error!("Failed to get rss, status code is not 200");
+                    Err(new_err("Failed to get rss, status code is not 200"))
                 }
             }
             Err(_) => {
-                log::warn!("Failed to get rss");
-                Err(CustomError("Failed to get rss".to_string()))
+                log::error!("Failed to get rss");
+                Err(new_err("Failed to get rss"))
             }
         }
     }).unwrap();
@@ -340,7 +159,7 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
     // Find the items in database, get the list of items not in database
     // For each item not in database, parse the episode information
     // Then insert the item into the database
-    let items_not_in_db = find_items_not_in_db(&result);
+    let items_not_in_db = filter_uncached_items(&result);
     for item in items_not_in_db {
         let item = retry(Fixed::from_millis(5000), || {
             match parse_episode(&item) {
@@ -351,9 +170,9 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, ParseError> {
                 }
             }
         }).unwrap();
-        insert_item(&item).unwrap();
+        insert_item_to_cache(&item).unwrap();
     }
-    let items_full = fetch_info_by_db(&result);
+    let items_full = fetch_cached_items(&result);
     Ok(items_full)
 }
 
@@ -381,7 +200,7 @@ pub fn expand_rss(items: Vec<MikanItem>) -> Vec<MikanItem> {
     result
 }
 
-fn parse_episode(item: &MikanItem) -> Result<MikanItem, ParseError> {
+fn parse_episode(item: &MikanItem) -> Result<MikanItem, Box<dyn Error>> {
     // build url from item's uuid
     let url = format!("https://mikanani.me/Home/Episode/{}", item.mikan_item_uuid);
 
@@ -392,12 +211,12 @@ fn parse_episode(item: &MikanItem) -> Result<MikanItem, ParseError> {
                     Ok(response.text().unwrap())
                 } else {
                     log::warn!("Failed to get episode info, status code is not 200");
-                    Err(CustomError("Failed to get episode info, status code is not 200".to_string()))
+                    Err(new_err("Failed to get episode info, status code is not 200"))
                 }
             }
             Err(_) => {
                 log::warn!("Failed to get episode info");
-                Err(CustomError("Failed to get episode info".to_string()))
+                Err(new_err("Failed to get episode info"))
             }
         }
     }).unwrap();

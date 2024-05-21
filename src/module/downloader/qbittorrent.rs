@@ -6,7 +6,7 @@ use lazy_static::lazy_static;
 use reqwest::blocking::{Client, multipart};
 use serde::Deserialize;
 
-use crate::config::{CONFIG, DownloaderConfig};
+use crate::module::config::{CONFIG, DownloaderConfig};
 use crate::module::library::AnimeSeasonItem;
 
 #[derive(Debug)]

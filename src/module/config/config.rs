@@ -144,5 +144,4 @@ mod tests {
         CONFIG.write().unwrap().save();
         CONFIG.write().unwrap().reset();
     }
-    
 }

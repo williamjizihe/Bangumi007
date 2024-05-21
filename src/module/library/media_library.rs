@@ -5,7 +5,6 @@ use lazy_static::lazy_static;
 use rusqlite::Connection;
 
 use crate::module::parser::mikan_parser;
-use crate::module::parser::mikan_parser::MikanItem;
 
 #[derive(Debug)]
 struct InitedDb {
@@ -142,7 +141,7 @@ pub fn create_season(season: &AnimeSeason) {
     ).unwrap();
 }
 
-pub fn create_item(item: &MikanItem) {
+pub fn create_item(item: &crate::module::database::cache::rss_mikan::MikanItem) {
     let conn = get_db_conn().unwrap();
     let season = read_season_info(item.mikan_subject_id, item.mikan_subgroup_id).unwrap();
     let episode_num_offseted = item.episode_num + season.episode_offset;
@@ -177,7 +176,7 @@ pub fn create_item(item: &MikanItem) {
     ).unwrap();
 }
 
-pub fn update_library(items: &Vec<MikanItem>) {
+pub fn update_library(items: &Vec<crate::module::database::cache::rss_mikan::MikanItem>) {
     // For each item in the fetched updating list,
     // Match the item with the corresponding anime season
     // If the season is not found, insert the season into the database
@@ -336,8 +335,8 @@ pub fn auto_season_config_clean() {
             codec: best_conf.1,
             episode_offset: season.episode_offset,
         },
-        true,
-        false);
+                             true,
+                             false);
     }
 }
 

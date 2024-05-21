@@ -8,7 +8,7 @@ use log4rs::append::file::FileAppender;
 use log4rs::config::{Appender, Logger};
 use log4rs::encode::pattern::PatternEncoder;
 
-use crate::config::CONFIG;
+use crate::module::config::CONFIG;
 
 lazy_static! {
     pub static ref LOG_HANDLE: RwLock<Handle> = RwLock::new(init_logging());
@@ -34,7 +34,7 @@ pub fn get_logging_config() -> Config {
             _ => {
                 log::warn!("Invalid log level, using warn instead");
                 log::LevelFilter::Warn
-            },
+            }
         }
     }
 
@@ -60,6 +60,7 @@ fn init_logging() -> Handle {
 }
 
 // Should be called at the beginning of the program
+#[deny(dead_code)]
 pub fn init() {
     let _a = LOG_HANDLE.read().unwrap();
 }
