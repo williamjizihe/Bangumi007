@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub rss_config: RSSConfig,
     pub log_config: LogConfig,
     pub downloader_config: DownloaderConfig,
+    pub parser_config: ParserConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -54,35 +55,49 @@ pub struct RSSItem {
     pub active: bool,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ParserConfig {
+    pub tmdb_config: TMDBConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TMDBConfig {
+    pub api_access_token_auth: String,
+    pub include_adult: bool,
+}
+
 impl AppConfig {
     fn default() -> Self {
-        let rss_config = RSSConfig {
-            list: vec![],
-            interval_seconds: 900,
-        };
-        let log_config = LogConfig {
-            log_level: "warn".to_string(),
-            log_file: "data/log/bangumi007.log".to_string(),
-            log_console: true,
-        };
-        let downloader_config = DownloaderConfig {
-            host: "localhost".to_string(),
-            port: 8080,
-            username: "admin".to_string(),
-            password: "password".to_string(),
-            ttl: 1800,
-            download_dir: "".to_string(),
-            category: "".to_string(),
-            tags: "Bangumi007".to_string(),
-            paused_after_add: false,
-            sequential_download: true,
-            first_last_piece_prio: true,
-        };
         AppConfig {
             first_run: true,
-            rss_config,
-            log_config,
-            downloader_config,
+            rss_config: RSSConfig {
+                list: vec![],
+                interval_seconds: 900,
+            },
+            log_config: LogConfig {
+                log_level: "warn".to_string(),
+                log_file: "data/log/bangumi007.log".to_string(),
+                log_console: true,
+            },
+            downloader_config: DownloaderConfig {
+                host: "localhost".to_string(),
+                port: 8080,
+                username: "admin".to_string(),
+                password: "password".to_string(),
+                ttl: 1800,
+                download_dir: "".to_string(),
+                category: "".to_string(),
+                tags: "Bangumi007".to_string(),
+                paused_after_add: false,
+                sequential_download: true,
+                first_last_piece_prio: true,
+            },
+            parser_config: ParserConfig {
+                tmdb_config: TMDBConfig {
+                    api_access_token_auth: "FILL_IN_TMCB_ACCESS_TOKEN_AUTH_HERE".to_string(),
+                    include_adult: false,
+                },
+            },
         }
     }
 

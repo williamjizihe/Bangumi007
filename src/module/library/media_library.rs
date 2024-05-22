@@ -369,8 +369,8 @@ pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_item
     // fetch items from the rss feed
     if fetch_items {
         let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", season.mikan_subject_id, season.mikan_subgroup_id);
-        let items = mikan_parser::parse_rss(&url).unwrap();
-        let items = mikan_parser::expand_rss(items);
+        let items = mikan_parser::update_rss(&url).unwrap();
+        let items = mikan_parser::expand_history_episodes(items);
         update_library(&items);
     }
 }

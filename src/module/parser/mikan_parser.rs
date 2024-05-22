@@ -12,10 +12,13 @@ use rusqlite::Result;
 use cache::rss_mikan::{fetch_cached_items, filter_uncached_items, insert_item_to_cache};
 
 use crate::module::database::cache;
-use crate::module::database::cache::rss_mikan::MikanItem;
-use crate::module::utils::error::new_err;
+use crate::module::database::cache::rss_mikan::{fetch_mikan_subject_info, insert_subject_to_cache, MikanItem, MikanSubject};
+use crate::module::parser::bangumi_parser;
+use crate::module::parser::bangumi_parser::parse_season_num_from_aliases;
+use crate::module::parser::tmdb_parser::{bangumi_parse_tmdb_info};
+use crate::module::utils::error::{new_err, new_warn};
 
-fn parse_codec(title: &str) -> String {
+fn parse_filename_to_codec(title: &str) -> String {
     // avc: H.264 AVC MP4
     // hevc: H.265 HEVC MKV
     // vp9: VP9
@@ -40,7 +43,7 @@ fn parse_codec(title: &str) -> String {
     result
 }
 
-fn parse_language(title: &str) -> String {
+fn parse_filename_to_language(title: &str) -> String {
     // hans: CHS GB 简
     // hant: CHT BIG5 繁
     // jpn: JP 日 双语
@@ -64,14 +67,45 @@ fn parse_language(title: &str) -> String {
     result
 }
 
+fn parse_filename_to_episode(filename: &str) -> Option<i32> {
+    // Parse the filename to get the episode number
+    let rules = [
+        r"(.*) - (\d{1,4}(?!\d|p)|\d{1,4}\.\d{1,2}(?!\d|p))(?:v\d{1,2})?(?: )?(?:END)?(.*)",
+        r"(.*)[\[\ E](\d{1,4}|\d{1,4}\.\d{1,2})(?:v\d{1,2})?(?: )?(?:END)?[\]\ ](.*)",
+        r"(.*)\[(?:第)?(\d*\.*\d*)[话集話](?:END)?\](.*)",
+        r"(.*)第?(\d*\.*\d*)[话話集](?:END)?(.*)",
+        r"(.*)(?:S\d{2})?EP?(\d+)(.*)",
+    ];
+    for rule in rules.iter() {
+        let re = Regex::new(rule).unwrap();
+        if let Ok(Some(caps)) = re.captures(filename) {
+            let episode = caps.get(2).unwrap().as_str().parse::<i32>().unwrap();
+            return Some(episode);
+        }
+    }
+    None
+}
+
 // TODO: exclude \d+-\d from title
 
+/// # RSS parser
 ///
-pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
-    // RSS parser
-    // Get the RSS feed from the URL and parse it with roxmltree.
-    // First read channel title and link
-    // Then read all the items in the feed channel. and get the title and link of each item.
+/// ## Input
+///
+/// RSS feed URL : `&str`
+///
+/// ## Procedure
+///
+/// 1. Get the RSS feed from Mikanani
+/// 2. Parse episodes not seen in cache database
+/// 3. Update cache database
+/// 4. Return Episode Items with detailed information
+///
+/// ## Output
+///
+/// `Vec` of `MikanItem`s.
+///
+pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
 
     // Get RSS feed
     // "get(url).unwrap().text().unwrap();" with retry
@@ -150,9 +184,12 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
             mikan_item_title: title.to_string(),        // Item Title
             mikan_item_magnet_link: "".to_string(),
             mikan_item_pub_date: pubdate.to_string(),   // Torrent PubDate
+            series_name: title.to_string(),
+            season_name: title.to_string(),
+            season_num: 1,
             episode_num: parse_filename_to_episode(&title).unwrap_or(-1),  // Episode Number
-            language: parse_language(&title),           // Language
-            codec: parse_codec(&title),                 // Codec
+            language: parse_filename_to_language(&title),           // Language
+            codec: parse_filename_to_codec(&title),                 // Codec
         });
     }
 
@@ -162,7 +199,7 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
     let items_not_in_db = filter_uncached_items(&result);
     for item in items_not_in_db {
         let item = retry(Fixed::from_millis(5000), || {
-            match parse_episode(&item) {
+            match fill_episode_information(&item) {
                 Ok(item) => Ok(item),
                 Err(_) => {
                     log::warn!("Failed to parse episode info");
@@ -176,7 +213,23 @@ pub fn parse_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
     Ok(items_full)
 }
 
-pub fn expand_rss(items: Vec<MikanItem>) -> Vec<MikanItem> {
+/// # Expand history episodes
+///
+/// ## Input
+///
+/// `Vec` of `MikanItem`s (can be of different mikanani subjects)
+///
+/// ## Procedure
+///
+/// 1. For each episode item in items, get its bangumi id and subgroup id
+/// 2. Parse all the episodes from the RSS feed of the specific bangumi-subgroup page
+/// 3. Append the completed episodes to the result
+///
+/// ## Output
+///
+/// Expanded `Vec` of `MikanItem`s.
+///
+pub fn expand_history_episodes(items: Vec<MikanItem>) -> Vec<MikanItem> {
     // Expand the RSS and get history episodes
     // For each item in items, get its bangumi id and subgroup id
     // Then visit https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}
@@ -189,7 +242,7 @@ pub fn expand_rss(items: Vec<MikanItem>) -> Vec<MikanItem> {
             continue;
         }
         let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", item.mikan_subject_id, item.mikan_subgroup_id);
-        let items_full = parse_rss(&url).unwrap();
+        let items_full = update_rss(&url).unwrap();
         // Add to the result
         for item in items_full {
             result.push(item);
@@ -200,7 +253,23 @@ pub fn expand_rss(items: Vec<MikanItem>) -> Vec<MikanItem> {
     result
 }
 
-fn parse_episode(item: &MikanItem) -> Result<MikanItem, Box<dyn Error>> {
+/// # Parse Episode
+///
+/// ## Input
+///
+/// `MikanItem` with only `mikan_item_uuid` field filled
+///
+/// ## Procedure
+///
+/// 1. Get the episode page from Mikanani
+/// 2. Parse the episode title, subgroup, magnet link, bangumi id, subgroup id
+/// 3. Return the `MikanItem` with all fields filled
+///
+/// ## Output
+///
+/// `MikanItem` with all fields filled
+///
+fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error>> {
     // build url from item's uuid
     let url = format!("https://mikanani.me/Home/Episode/{}", item.mikan_item_uuid);
 
@@ -263,51 +332,117 @@ fn parse_episode(item: &MikanItem) -> Result<MikanItem, Box<dyn Error>> {
     let ep_title = &ep_title[..end];
     log::debug!("Episode Title: {}", ep_title);
 
-    // Parse bangumi id and subgroup id
+    // Parse subject id and subgroup id
     // e.g. find "?bangumiId=" + 3332(bgmid) + "&subgroupId=" + 583(subgid)
-    let bgmid = response.find("?bangumiId=").unwrap();
-    let bgmid = &response[bgmid + 11..];
-    let bgmid = bgmid.split('&').next().unwrap();
-    let bgmid = bgmid.parse::<i32>().unwrap();
-    log::debug!("Bangumi ID: {}", bgmid);
+    let mikan_subject_id = response.find("?bangumiId=").unwrap();
+    let mikan_subject_id = &response[mikan_subject_id + 11..];
+    let mikan_subject_id = mikan_subject_id.split('&').next().unwrap();
+    let mikan_subject_id = mikan_subject_id.parse::<i32>().unwrap();
+    log::debug!("Subject ID: {}", mikan_subject_id);
     let subgid = response.find("&subgroupid=").unwrap();
     let subgid = &response[subgid + 12..];
     let subgid = subgid.split('\"').next().unwrap();
     let subgid = subgid.parse::<i32>().unwrap();
     log::debug!("Subgroup ID: {}", subgid);
 
+    let mikan_subject_info = match fetch_mikan_subject_info(mikan_subject_id) {
+        Some(info) => Some(info),       // Use cached info
+        None => {
+            // 1. Parse Bangumi subject id
+            // 2. Parse the season number using all the names fetched by Bangumi API
+            // 3. Parse the series name by searching in TMDB API
+            // 4. For failed season-num parses, try to find the name in TMDB Subject's Seasons.
+
+            // 1. Parse Bangumi subject id
+            let bangumi_subject_id = bangumi_parser::get_bangumi_subject_id(mikan_subject_id).map_or(-1, |x| x);
+            log::debug!("Bangumi Subject ID: {}", bangumi_subject_id);
+
+            // 2. Parse the season number using all the names fetched by Bangumi API
+            let bangumi_aliases = bangumi_parser::get_bangumi_subject_aliases(bangumi_subject_id);
+            let bangumi_season_num = match &bangumi_aliases {
+                Ok(aliases) => { parse_season_num_from_aliases(aliases) } // Parse
+                Err(_) => None
+            };
+            let bangumi_subject_name = match &bangumi_aliases {
+                Ok(aliases) => { aliases.iter().next().unwrap().clone() }
+                Err(_) => "".to_string()
+            };
+
+            // 3-4: Parse using TMDB API
+            let tmdb_info = bangumi_parse_tmdb_info(bangumi_subject_id)
+                .map_err(|e| new_warn(&format!("Failed to parse TMDB info: {}", e)));
+            match tmdb_info {
+                Ok(tmdb_info) => {
+                    let subject = MikanSubject {
+                        mikan_subject_id,
+                        bangumi_subject_id,
+                        bangumi_subject_name,
+                        bangumi_season_num: bangumi_season_num.unwrap_or(-1),
+                        tmdb_series_id: tmdb_info.media_id as i32,
+                        tmdb_series_name: tmdb_info.media_name,
+                        tmdb_season_num: tmdb_info.season_number as i32,
+                        tmdb_season_name: tmdb_info.season_name,
+                    };
+                    // Insert the subject info into the database
+                    insert_subject_to_cache(&subject).unwrap();
+                    Some(subject)
+                }
+                Err(_) => Some(MikanSubject {
+                    mikan_subject_id,
+                    bangumi_subject_id,
+                    bangumi_subject_name,
+                    bangumi_season_num: bangumi_season_num.unwrap_or(-1),
+                    tmdb_series_id: -1,
+                    tmdb_series_name: "".to_string(),
+                    tmdb_season_num: -1,
+                    tmdb_season_name: "".to_string(),
+                })
+            }
+        }
+    };
+
+    let season_num = match &mikan_subject_info {
+        Some(info) => match info.bangumi_season_num {
+            -1 => match info.tmdb_season_num {
+                -1 => 1,
+                _ => info.tmdb_season_num
+            },
+            _ => info.bangumi_season_num
+        },
+        None => 1
+    };
+
+    let series_name = match &mikan_subject_info {
+        Some(info) => {
+            // if the series name is empty, use mikan's subject title
+            if !info.tmdb_series_name.is_empty() { info.tmdb_series_name.clone() } else { title.to_string() }
+        }
+        None => title.to_string()
+    };
+
+    let season_name = match &mikan_subject_info {
+        Some(info) => {
+            // if the season name is empty, use mikan's subject title
+            if !info.tmdb_season_name.is_empty() { info.tmdb_series_name.clone() } else { title.to_string() }
+        }
+        None => title.to_string()
+    };
+
     Ok(MikanItem {
         mikan_item_uuid: item.mikan_item_uuid.to_string(),
-        mikan_subject_id: bgmid,
+        mikan_subject_id,
         mikan_subgroup_id: subgid,
         mikan_subject_title: title.to_string(),
         mikan_item_title: item.mikan_item_title.to_string(),
         mikan_item_magnet_link: magnet.to_string(),
         mikan_item_pub_date: item.mikan_item_pub_date.to_string(),
+        series_name,
+        season_name,
+        season_num,
         episode_num: item.episode_num,
         language: item.language.to_string(),
         codec: item.codec.to_string(),
     })
-}
-
-
-fn parse_filename_to_episode(filename: &str) -> Option<i32> {
-    // Parse the filename to get the episode number
-    let rules = [
-        r"(.*) - (\d{1,4}(?!\d|p)|\d{1,4}\.\d{1,2}(?!\d|p))(?:v\d{1,2})?(?: )?(?:END)?(.*)",
-        r"(.*)[\[\ E](\d{1,4}|\d{1,4}\.\d{1,2})(?:v\d{1,2})?(?: )?(?:END)?[\]\ ](.*)",
-        r"(.*)\[(?:第)?(\d*\.*\d*)[话集話](?:END)?\](.*)",
-        r"(.*)第?(\d*\.*\d*)[话話集](?:END)?(.*)",
-        r"(.*)(?:S\d{2})?EP?(\d+)(.*)",
-    ];
-    for rule in rules.iter() {
-        let re = Regex::new(rule).unwrap();
-        if let Ok(Some(caps)) = re.captures(filename) {
-            let episode = caps.get(2).unwrap().as_str().parse::<i32>().unwrap();
-            return Some(episode);
-        }
-    }
-    None
 }
 
 
@@ -318,7 +453,7 @@ mod tests {
     #[test]
     fn test_parse_rss() {
         let url = "https://mikanani.me/RSS/Bangumi?bangumiId=3305&subgroupid=382";
-        let items = parse_rss(url).unwrap();
+        let items = update_rss(url).unwrap();
         for item in items {
             println!("{:?}", item);
         }
