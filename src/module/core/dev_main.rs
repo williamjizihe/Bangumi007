@@ -2,7 +2,7 @@ use crate::module::core::init::run_init;
 use crate::module::database::library::{read_season_items, read_seasons};
 use crate::module::downloader::qbittorrent::download_items;
 use crate::module::library::{auto_season_config_clean, update_library};
-use crate::module::parser::mikan_parser::update_rss;
+use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
 
 pub fn run() {
     run_init().unwrap();
@@ -14,7 +14,7 @@ pub fn run() {
         if rss.active {
             let items = update_rss(&*rss.url).unwrap();
             // By default, only incremental, not expanding the history
-            // let items = expand_rss(items);
+            let items = expand_history_episodes(items);
             update_library(&items);
         }
     }
