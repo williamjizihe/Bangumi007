@@ -110,7 +110,7 @@ pub fn create_season(season: &AnimeSeason) {
             conf_episode_offset,
             conf_language,
             conf_codec
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         &[
             &season.mikan_subject_id.to_string(),
             &season.mikan_subgroup_id.to_string(),
