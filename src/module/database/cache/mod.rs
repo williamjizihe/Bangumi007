@@ -1,2 +1,2 @@
-pub mod rss_mikan;
+pub mod rss;
 

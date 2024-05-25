@@ -9,13 +9,13 @@ use retry::retry;
 use roxmltree::Document;
 use rusqlite::Result;
 
-use cache::rss_mikan::{fetch_cached_items, filter_uncached_items, insert_item_to_cache};
+use cache::rss::{fetch_cached_items, filter_uncached_items, insert_item_to_cache};
 
 use crate::module::database::cache;
-use crate::module::database::cache::rss_mikan::{fetch_mikan_subject_info, insert_subject_to_cache, MikanItem, MikanSubject};
+use crate::module::database::cache::rss::{fetch_mikan_subject_info, insert_subject_to_cache, MikanItem, MikanSubject};
 use crate::module::parser::bangumi_parser;
 use crate::module::parser::bangumi_parser::parse_season_num_from_aliases;
-use crate::module::parser::tmdb_parser::{bangumi_parse_tmdb_info};
+use crate::module::parser::tmdb_parser::bangumi_parse_tmdb_info;
 use crate::module::utils::error::{new_err, new_warn};
 
 fn parse_filename_to_codec(title: &str) -> String {
@@ -153,7 +153,7 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
             .find(|n| n.has_tag_name("title")).unwrap()
             .text()
             .unwrap();
-        
+
         // Exclude the items with \d+-\d in title
         let reg_season = Regex::new(r"\d+-\d").unwrap();
         if reg_season.is_match(&title).unwrap_or(false) {
@@ -185,16 +185,17 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
             mikan_item_uuid: uuid.to_string(),          // Item UUID
             mikan_subject_id: 0,
             mikan_subgroup_id: 0,
-            mikan_subject_title: "".to_string(),
+            mikan_subject_name: "".to_string(),
             mikan_item_title: title.to_string(),        // Item Title
             mikan_item_magnet_link: "".to_string(),
             mikan_item_pub_date: pubdate.to_string(),   // Torrent PubDate
-            series_name: title.to_string(),
-            season_name: title.to_string(),
-            season_num: 1,
-            episode_num: parse_filename_to_episode(&title).unwrap_or(-1),  // Episode Number
-            language: parse_filename_to_language(&title),           // Language
-            codec: parse_filename_to_codec(&title),                 // Codec
+            tmdb_series_name: title.to_string(),
+            tmdb_season_name: title.to_string(),
+            tmdb_parsed_season_num: -1,
+            bangumi_parsed_season_num: -1,
+            mikan_parsed_episode_num: parse_filename_to_episode(&title).unwrap_or(-1),  // Episode Number
+            mikan_parsed_language: parse_filename_to_language(&title),           // Language
+            mikan_parsed_codec: parse_filename_to_codec(&title),                 // Codec
         });
     }
 
@@ -387,6 +388,7 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
                         tmdb_series_name: tmdb_info.media_name,
                         tmdb_season_num: tmdb_info.season_number as i32,
                         tmdb_season_name: tmdb_info.season_name,
+                        bangumi_to_tmdb_episode_offset: 0,      // TODO: parse episode offset between tmdb v.s. filename
                     };
                     // Insert the subject info into the database
                     insert_subject_to_cache(&subject).unwrap();
@@ -401,53 +403,59 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
                     tmdb_series_name: "".to_string(),
                     tmdb_season_num: -1,
                     tmdb_season_name: "".to_string(),
+                    bangumi_to_tmdb_episode_offset: 0,
                 })
             }
         }
     };
 
-    // Using tmdb season num as default. 
-    let season_num = match &mikan_subject_info {
-        Some(info) => match info.tmdb_season_num {
-            -1 => match info.bangumi_season_num {
-                -1 => 1,
-                _ => info.bangumi_season_num
-            },
-            _ => info.tmdb_season_num
-        },
-        None => 1
-    };
+    // // Using tmdb season num as default.
+    // let season_num = match &mikan_subject_info {
+    //     Some(info) => match info.tmdb_season_num {
+    //         -1 => match info.bangumi_season_num {
+    //             -1 => 1,
+    //             _ => info.bangumi_season_num
+    //         },
+    //         _ => info.tmdb_season_num
+    //     },
+    //     None => 1
+    // };
 
-    let series_name = match &mikan_subject_info {
-        Some(info) => {
-            // if the series name is empty, use mikan's subject title
-            if !info.tmdb_series_name.is_empty() { info.tmdb_series_name.clone() } else { title.to_string() }
-        }
-        None => title.to_string()
-    };
+    // Store season num separately
+    let bangumi_season_num = mikan_subject_info.as_ref().map_or(-1, |info| info.bangumi_season_num);
 
-    let season_name = match &mikan_subject_info {
-        Some(info) => {
-            // if the season name is empty, use mikan's subject title
-            if !info.tmdb_season_name.is_empty() { info.tmdb_series_name.clone() } else { title.to_string() }
-        }
-        None => title.to_string()
+    let tmdb_season_num = mikan_subject_info.as_ref().map_or(-1, |info| info.tmdb_season_num);
+
+    let series_name = mikan_subject_info.as_ref().map_or(title.to_string(), |info| {
+        // if the series name is empty, use mikan's subject title
+        if !info.tmdb_series_name.is_empty() { info.tmdb_series_name.clone() } else { title.to_string() }
+    });
+
+    let season_name = mikan_subject_info.as_ref().map_or(title.to_string(), |info| {
+        // if the season name is empty, use mikan's subject title
+        if !info.tmdb_season_name.is_empty() { info.tmdb_series_name.clone() } else { title.to_string() }
+    });
+
+    let episode_offset = match &mikan_subject_info {
+        Some(info) => info.bangumi_to_tmdb_episode_offset,
+        None => 0
     };
 
     Ok(MikanItem {
         mikan_item_uuid: item.mikan_item_uuid.to_string(),
         mikan_subject_id,
         mikan_subgroup_id: subgid,
-        mikan_subject_title: title.to_string(),
+        mikan_subject_name: title.to_string(),
         mikan_item_title: item.mikan_item_title.to_string(),
         mikan_item_magnet_link: magnet.to_string(),
         mikan_item_pub_date: item.mikan_item_pub_date.to_string(),
-        series_name,
-        season_name,
-        season_num,
-        episode_num: item.episode_num,
-        language: item.language.to_string(),
-        codec: item.codec.to_string(),
+        tmdb_series_name: series_name,
+        tmdb_season_name: season_name,
+        tmdb_parsed_season_num: tmdb_season_num,
+        bangumi_parsed_season_num: bangumi_season_num,
+        mikan_parsed_episode_num: item.mikan_parsed_episode_num + episode_offset,
+        mikan_parsed_language: item.mikan_parsed_language.to_string(),
+        mikan_parsed_codec: item.mikan_parsed_codec.to_string(),
     })
 }
 

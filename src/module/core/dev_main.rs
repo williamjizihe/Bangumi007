@@ -1,6 +1,7 @@
 use crate::module::core::init::run_init;
+use crate::module::database::library::{read_season_items, read_seasons};
 use crate::module::downloader::qbittorrent::download_items;
-use crate::module::library::{auto_season_config_clean, read_all_items, read_season_items, read_seasons, update_library};
+use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::update_rss;
 
 pub fn run() {
@@ -21,11 +22,11 @@ pub fn run() {
     auto_season_config_clean();
     // Output media library
     for season in read_seasons() {
-        println!("Season: {:?}", season.mikan_subject_title);
+        println!("Season: {:?}", season.mikan_subject_name);
         print!("Ep: ");
         let season_items = read_season_items(season.mikan_subject_id, season.mikan_subgroup_id);
         for item in season_items {
-            print!("{:?} ", item.episode_num_offseted);
+            print!("{:?} ", item.disp_episode_num);
         }
         println!();
     }

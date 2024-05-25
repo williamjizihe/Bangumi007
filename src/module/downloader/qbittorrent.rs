@@ -7,7 +7,7 @@ use reqwest::blocking::{Client, multipart};
 use serde::Deserialize;
 
 use crate::module::config::{CONFIG, DownloaderConfig};
-use crate::module::library::AnimeSeasonItem;
+use crate::module::database::library::AnimeSeasonItem;
 
 #[derive(Debug)]
 struct Downloader {
@@ -104,7 +104,7 @@ fn get_config() -> DownloaderConfig {
     CONFIG.read().unwrap().downloader_config.clone()
 }
 
-fn login() -> Result<(), Box<dyn std::error::Error>> {
+fn login() -> Result<(), Box<dyn Error>> {
     log::debug!("Attempting to login");
     let config = get_config();
     let url = format!("http://{}:{}/api/v2/auth/login", config.host, config.port);
@@ -137,7 +137,7 @@ fn login() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn relogin_if_needed() -> Result<(), Box<dyn std::error::Error>> {
+fn relogin_if_needed() -> Result<(), Box<dyn Error>> {
     let config = get_config();
     if chrono::Local::now().timestamp() - DOWNLOADER.read().unwrap().last_login > config.ttl {
         log::debug!("Session expired, login needed");
@@ -146,12 +146,12 @@ fn relogin_if_needed() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn add_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn std::error::Error>> {
+fn add_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn Error>> {
     log::debug!("Adding torrent");
     let config = get_config();
     relogin_if_needed()?;
     // replace \ / : * ? " < > |
-    let title = item.mikan_subject_title
+    let title = item.mikan_subject_name
         .replace("\\", "")
         .replace("/", "")
         .replace(":", "")
@@ -335,7 +335,7 @@ fn get_fileinfo(hash: &String) -> Result<Vec<TorrentFile>, Box<dyn Error>> {
 //             let new_path = format!(
 //                 // "{} S{:02}E{:02}.{}",
 //                 "{} S01E{:02}.{}",
-//                 item.mikan_subject_title,
+//                 item.mikan_subject_name,
 //                 item.episode_num_offseted,
 //                 old_path.split(".").last().unwrap(),
 //             );
