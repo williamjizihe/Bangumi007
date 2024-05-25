@@ -86,8 +86,6 @@ fn parse_filename_to_episode(filename: &str) -> Option<i32> {
     None
 }
 
-// TODO: exclude \d+-\d from title
-
 /// # RSS parser
 ///
 /// ## Input
@@ -155,6 +153,13 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
             .find(|n| n.has_tag_name("title")).unwrap()
             .text()
             .unwrap();
+        
+        // Exclude the items with \d+-\d in title
+        let reg_season = Regex::new(r"\d+-\d").unwrap();
+        if reg_season.is_match(&title).unwrap_or(false) {
+            log::info!("Skipping item: {}", title);
+            continue;
+        }
 
         // Episode Link (on Mikanani)
         let link = item
