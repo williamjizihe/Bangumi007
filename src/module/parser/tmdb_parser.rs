@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::error::Error;
+use log::trace;
 
 use retry::delay::Fixed;
 
@@ -185,6 +186,10 @@ pub fn tmdb_search_season_in_infos(lang_json: &HashMap<String, serde_json::Value
             for (_, season_name) in season_name_dict {
                 // Replace 第 1 季 as 第1季
                 let season_name = season_name.replace("第 ", "第").replace(" 季", "季");
+                // Replace シーズン3 or シーズン 3 as 第3シーズン
+                let reg_season = regex::Regex::new(r"シーズン ?(\d+)").unwrap();
+                let season_name = reg_season.replace_all(&season_name, "第$1シーズン").to_string();
+                let alias = reg_season.replace_all(&alias, "第$1シーズン").to_string();
                 // alias与season_name的最长公共子串
                 let mut match_len = 0;
                 let mut i = 0;
@@ -322,7 +327,7 @@ mod tests {
     fn test_tmdb() {
         // Parse 异世界魔王与召唤少女的奴隶魔术OMEGA
         logger::init();
-        let bangumi_ids = vec![455835, 416777, 350235, ];     //285666, 303864, 444557, 208908, 455345, 425978,
+        let bangumi_ids = vec![342667, ];     //285666, 303864, 444557, 208908, 455345, 425978, 455835, 416777, 350235, 364522
         for bangumi_id in bangumi_ids {
             let aliases = get_bangumi_subject_aliases(bangumi_id).unwrap();
             // For each alias, search in tmdb
