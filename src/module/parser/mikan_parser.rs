@@ -406,13 +406,14 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
         }
     };
 
+    // Using tmdb season num as default. 
     let season_num = match &mikan_subject_info {
-        Some(info) => match info.bangumi_season_num {
-            -1 => match info.tmdb_season_num {
+        Some(info) => match info.tmdb_season_num {
+            -1 => match info.bangumi_season_num {
                 -1 => 1,
-                _ => info.tmdb_season_num
+                _ => info.bangumi_season_num
             },
-            _ => info.bangumi_season_num
+            _ => info.tmdb_season_num
         },
         None => 1
     };
