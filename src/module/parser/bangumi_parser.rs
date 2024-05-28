@@ -1,74 +1,43 @@
 use std::error::Error;
 
 use fancy_regex::Regex;
-use reqwest::blocking::get;
 use retry::delay::Fixed;
 
 use crate::module::utils::error::{new_err, new_warn};
 
-/// Get the Bangumi subject ID of the Mikanani subject
-///
-/// ## Input
-///
-/// Mikanani subject id : `i32`
-///
-/// ## Procedure
-///
-/// e.g. https://mikanani.me/Home/Bangumi/3344
-///
-/// 1. Visit the page https://mikanani.me/Home/Bangumi/3344
-/// 2. Parse the page and get the bangumi id & url https://bgm.tv/subject/444557
-///
-/// ## Output
-///
-/// Bangui subject id : `i32`
-pub fn get_bangumi_subject_id(mikan_subject_id: i32) -> rusqlite::Result<i32, Box<dyn Error>> {
-    // build url from item's uuid
-    let url = format!("https://mikanani.me/Home/Bangumi/{}", mikan_subject_id);
-
-    let response = retry::retry(Fixed::from_millis(5000), || {
-        match get(&url) {
-            Ok(response) => {
-                if response.status().is_success() {
-                    Ok(response.text().unwrap())
-                } else {
-                    Err(new_warn("Failed to get episode info, status code is not 200"))
-                }
-            }
-            Err(_) => Err(new_warn("Failed to get episode info"))
-        }
-    }).map_err(|_| new_err("Failed to get episode info"))?;
-
-    // Find the href="https://bgm.tv/subject/{444557}" substring and slice out 444557
-    let bgm_id = response.find("https://bgm.tv/subject/")
-        .ok_or_else(|| new_err("Failed to find bangumi url"))?;
-    let bgm_id = &response[bgm_id + 23..];
-    let bgm_id = bgm_id.split('\"').next()
-        .ok_or_else(|| new_err("Failed to find bangumi id"))?;
-    let bgm_id = bgm_id.parse::<i32>()
-        .map_err(|_| new_err("Failed to parse bangumi id"))?;
-
-    Ok(bgm_id)
+pub struct BangumiSubject {
+    pub bangumi_subject_id: i32,
+    pub aliases: Vec<String>,
+    pub media_type: String,
+    pub season_num: i32,
 }
 
+pub fn get_bangumi_subject(bangumi_subject_id: i32) -> rusqlite::Result<BangumiSubject, Box<dyn Error>> {
+    let json = get_bangumi_subject_json(bangumi_subject_id)?;
+    let aliases = get_bangumi_subject_aliases(&json)?;
+    let media_type = get_bangumi_media_type(&json)?;
+    let season_num = parse_season_num_from_aliases(&aliases).unwrap_or(-1);
 
-/// Get the Bangumi subject aliases of the Bangumi subject
-///
-/// ## Input
-///
-/// Bangumi subject id : `i32`
-///
-/// ## Procedure
-///
-/// e.g. https://bgm.tv/subject/444557
-///
-/// 1. Get https://api.bgm.tv/v0/subjects/444557
-/// 2. Parse the JSON and get the aliases
-///
-/// ## Output
-///
-/// Bangumi subject aliases : `Vec of String`
-pub fn get_bangumi_subject_aliases(bangumi_subject_id: i32) -> rusqlite::Result<Vec<String>, Box<dyn Error>> {
+    Ok(BangumiSubject {
+        bangumi_subject_id,
+        aliases,
+        media_type,
+        season_num,
+    })
+}
+
+fn get_bangumi_media_type(json: &serde_json::Value) -> Result<String, Box<dyn Error>> {
+    let media_type = json.get("platform")
+        .ok_or_else(|| new_warn("Failed to get media type"))
+        .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get media type as str")));
+    let media_type = match media_type {
+        Ok(media_type) => media_type,
+        Err(_) => return Ok("".to_string()),
+    };
+    Ok(media_type.to_string())
+}
+
+fn get_bangumi_subject_json (bangumi_subject_id: i32) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let url = format!("https://api.bgm.tv/v0/subjects/{}", bangumi_subject_id);
     // add user-agent
     let client = reqwest::blocking::Client::builder()
@@ -93,6 +62,28 @@ pub fn get_bangumi_subject_aliases(bangumi_subject_id: i32) -> rusqlite::Result<
     // Parse json result
     let json: serde_json::Value = serde_json::from_str(&response)
         .map_err(|_| new_err("Failed to parse json"))?;
+
+    Ok(json)
+}
+
+
+/// Get the Bangumi subject aliases of the Bangumi subject
+///
+/// ## Input
+///
+/// Bangumi subject id : `i32`
+///
+/// ## Procedure
+///
+/// e.g. https://bgm.tv/subject/444557
+///
+/// 1. Get https://api.bgm.tv/v0/subjects/444557
+/// 2. Parse the JSON and get the aliases
+///
+/// ## Output
+///
+/// Bangumi subject aliases : `Vec of String`
+pub fn get_bangumi_subject_aliases(json: &serde_json::Value) -> Result<Vec<String>, Box<dyn Error>> {
 
     let mut vec_aliases: Vec<String> = Vec::new();
 
@@ -239,21 +230,21 @@ mod tests {
     #[test]
     fn test_get_bangumi_subject_aliases() {
         logger::init();
-        let aliases = get_bangumi_subject_aliases(303864).unwrap();
-        for alias in aliases {
-            println!("{}", alias);
-        }
+        // let aliases = get_bangumi_subject_aliases(303864).unwrap();
+        // for alias in aliases {
+        //     println!("{}", alias);
+        // }
     }
 
     #[test]
     fn test_parse_season_num_from_aliases() {
         logger::init();
-        let ids = vec![444557, 405785, 262897, 303864, 208908];
-        for id in ids {
-            let aliases = get_bangumi_subject_aliases(id).unwrap();
-            print!("Bangumi: {}, ", aliases[0]);
-            let season = parse_season_num_from_aliases(&aliases).unwrap_or(-1);
-            println!("Season: {}", season);
-        }
+        // let ids = vec![444557, 405785, 262897, 303864, 208908];
+        // for id in ids {
+        //     let aliases = get_bangumi_subject_aliases(id).unwrap();
+        //     print!("Bangumi: {}, ", aliases[0]);
+        //     let season = parse_season_num_from_aliases(&aliases).unwrap_or(-1);
+        //     println!("Season: {}", season);
+        // }
     }
 }

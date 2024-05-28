@@ -7,7 +7,7 @@ use reqwest::blocking::{Client, multipart};
 use serde::Deserialize;
 
 use crate::module::config::{CONFIG, DownloaderConfig};
-use crate::module::database::library::AnimeSeasonItem;
+use crate::module::database::library::{AnimeSeason, AnimeSeasonItem, read_season_info};
 
 #[derive(Debug)]
 struct Downloader {
@@ -150,18 +150,7 @@ fn add_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn Error>> {
     log::debug!("Adding torrent");
     let config = get_config();
     relogin_if_needed()?;
-    // replace \ / : * ? " < > |
-    let title = item.mikan_subject_name
-        .replace("\\", "")
-        .replace("/", "")
-        .replace(":", "")
-        .replace("*", "")
-        .replace("?", "")
-        .replace("\"", "")
-        .replace("<", "")
-        .replace(">", "")
-        .replace("|", "");
-    let savepath = format!("{}/{}", config.download_dir, title);
+    let savepath = item_to_savepath(item);
     let url = format!("http://{}:{}/api/v2/torrents/add", config.host, config.port);
     let form = multipart::Form::new()
         .text("urls", item.mikan_item_magnet_link.clone())
@@ -186,65 +175,144 @@ fn add_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn item_to_series_info(item: &AnimeSeasonItem) -> Option<AnimeSeason> {
+    let season_info = read_season_info(item.mikan_subject_id, item.mikan_subgroup_id);
+    season_info
+}
 
-// fn add_torrent(magnet_link: String) -> Result<(), Box<dyn std::error::Error>> {
-//     log::debug!("Adding torrent");
-//     let config = get_config();
-//     relogin_if_needed()?;
-//     let url = format!("http://{}:{}/api/v2/torrents/add", config.host, config.port);
-//     let form = multipart::Form::new()
-//         .text("urls", magnet_link)
-//         .text("savepath", config.download_dir)
-//         .text("category", config.category)
-//         .text("tags", config.tags)
-//         .text("paused", if config.paused_after_add { "true" } else { "false" })
-//         .text("autoTMM", "false")
-//         .text("sequentialDownload", if config.sequential_download { "true" } else { "false" })
-//         .text("firstLastPiecePrio", if config.first_last_piece_prio { "true" } else { "false" });
-//     let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
-//     let resp = DOWNLOADER.write().unwrap().client.post(&url)
-//         .header("Referer", format!("http://{}:{}", config.host, config.port))
-//         .header("Origin", format!("http://{}:{}", config.host, config.port))
-//         .header("Cookie", cookie)
-//         .multipart(form)
-//         .send()?;
-//     log::debug!("Add torrent response status: {}", resp.status());
-//     let body = resp.text()?;
-//     log::debug!("Add torrent response: {}", body);
-//
-//     Ok(())
-// }
+fn item_to_savepath(item: &AnimeSeasonItem) -> String {
+    let config = get_config();
+    let season_info = read_season_info(item.mikan_subject_id, item.mikan_subgroup_id);
+    let series_name = match &season_info { 
+        Some(season_info) => season_info.disp_series_name.clone(),
+        None => match item.tmdb_series_name.as_str() {
+            "" => item.mikan_subject_name.clone(),
+            _ => item.tmdb_series_name.clone(),
+        }
+    };
+    let season_num = match season_info {
+        Some(season_info) => season_info.disp_season_num,
+        None => match item.tmdb_parsed_season_num {
+            -1 => item.bangumi_parsed_season_num,
+            _ => item.tmdb_parsed_season_num,
+        }
+    };
+    // replace \ / : * ? " < > |
+    let series_name = series_name
+        .replace("\\", "")
+        .replace("/", "")
+        .replace(":", "")
+        .replace("*", "")
+        .replace("?", "")
+        .replace("\"", "")
+        .replace("<", "")
+        .replace(">", "")
+        .replace("|", "");
+    let savepath = format!("{}/{}/Season {}", config.download_dir, series_name, season_num);
+    savepath
+}
 
-// fn add_torrents(magnet_link: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn std::error::Error>> {
-//     log::debug!("Adding torrents");
-//     let config = get_config();
-//     relogin_if_needed()?;
-//     let download_dir = config.download_dir.clone();
-//     // join bangumi name into download_dir
-//
-//     let url = format!("http://{}:{}/api/v2/torrents/add", config.host, config.port);
-//     let form = multipart::Form::new()
-//         .text("urls", magnet_link.join("\n"))
-//         .text("savepath", download_dir)
-//         .text("category", config.category)
-//         .text("tags", config.tags)
-//         .text("paused", if config.paused_after_add { "true" } else { "false" })
-//         .text("autoTMM", "false")
-//         .text("sequentialDownload", if config.sequential_download { "true" } else { "false" })
-//         .text("firstLastPiecePrio", if config.first_last_piece_prio { "true" } else { "false" });
-//     let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
-//     let resp = DOWNLOADER.write().unwrap().client.post(&url)
-//         .header("Referer", format!("http://{}:{}", config.host, config.port))
-//         .header("Origin", format!("http://{}:{}", config.host, config.port))
-//         .header("Cookie", cookie)
-//         .multipart(form)
-//         .send()?;
-//     log::debug!("Add torrent response status: {}", resp.status());
-//     let body = resp.text()?;
-//     log::debug!("Add torrent response: {}", body);
-//
-//     Ok(())
-// }
+fn maglink_to_hash(magnet_link: &String) -> String {
+    let hash = magnet_link.split("btih:").last().unwrap();
+    let hash = hash.split("&").next().unwrap();
+    hash.to_string()
+}
+
+fn move_torrent_item(item: &AnimeSeasonItem) -> Result<(), Box<dyn Error>> {
+    // TODO: not implemented
+    log::debug!("Moving torrent");
+    let config = get_config();
+    relogin_if_needed()?;
+    let savepath = item_to_savepath(item);
+    let savepath = urlencoding::encode(&savepath);
+    let url = format!("http://{}:{}/api/v2/torrents/setLocation", config.host, config.port);
+    // application/x-www-form-urlencoded
+    let body = format!("hashes={}&location={}",
+                       maglink_to_hash(&item.mikan_item_magnet_link),
+                       savepath);
+    let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
+    let resp = DOWNLOADER.write().unwrap().client.post(&url)
+        .header("Referer", format!("http://{}:{}", config.host, config.port))
+        .header("Origin", format!("http://{}:{}", config.host, config.port))
+        .header("Cookie", cookie)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()?;
+    log::debug!("Move torrent response status: {}", resp.status());
+    let body = resp.text()?;
+    log::debug!("Move torrent response: {}", body);
+
+    Ok(())
+}
+
+fn set_torrent_category(item: &AnimeSeasonItem) -> Result<(), Box<dyn Error>> {
+    log::debug!("Setting torrent category");
+    let config = get_config();
+    relogin_if_needed()?;
+    let url = format!("http://{}:{}/api/v2/torrents/setCategory", config.host, config.port);
+    // application/x-www-form-urlencoded
+    let category = urlencoding::encode(&config.category);
+    let body = format!("hashes={}&category={}", maglink_to_hash(&item.mikan_item_magnet_link), category);
+    let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
+    let resp = DOWNLOADER.write().unwrap().client.post(&url)
+        .header("Referer", format!("http://{}:{}", config.host, config.port))
+        .header("Origin", format!("http://{}:{}", config.host, config.port))
+        .header("Cookie", cookie)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()?;
+    log::debug!("Set torrent category response status: {}", resp.status());
+    let body = resp.text()?;
+    log::debug!("Set torrent category response: {}", body);
+
+    Ok(())
+}
+
+fn add_torrent_tags(item: &AnimeSeasonItem) -> Result<(), Box<dyn Error>> {
+    log::debug!("Adding torrent tags");
+    let config = get_config();
+    relogin_if_needed()?;
+    let url = format!("http://{}:{}/api/v2/torrents/addTags", config.host, config.port);
+    // application/x-www-form-urlencoded
+    let tags = urlencoding::encode(&config.tags);
+    let body = format!("hashes={}&tags={}", maglink_to_hash(&item.mikan_item_magnet_link), tags);
+    let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
+    let resp = DOWNLOADER.write().unwrap().client.post(&url)
+        .header("Referer", format!("http://{}:{}", config.host, config.port))
+        .header("Origin", format!("http://{}:{}", config.host, config.port))
+        .header("Cookie", cookie)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()?;
+    log::debug!("Add torrent tags response status: {}", resp.status());
+    let body = resp.text()?;
+    log::debug!("Add torrent tags response: {}", body);
+
+    Ok(())
+}
+
+fn set_torrent_automatic_management(item: &AnimeSeasonItem, atm: bool) -> Result<(), Box<dyn Error>> {
+    log::debug!("Setting torrent automatic management");
+    let config = get_config();
+    relogin_if_needed()?;
+    let url = format!("http://{}:{}/api/v2/torrents/setAutoManagement", config.host, config.port);
+    // application/x-www-form-urlencoded
+    let atm = if atm { "true" } else { "false" };
+    let body = format!("hashes={}&enable={}", maglink_to_hash(&item.mikan_item_magnet_link), atm);
+    let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
+    let resp = DOWNLOADER.write().unwrap().client.post(&url)
+        .header("Referer", format!("http://{}:{}", config.host, config.port))
+        .header("Origin", format!("http://{}:{}", config.host, config.port))
+        .header("Cookie", cookie)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()?;
+    log::debug!("Set torrent automatic management response status: {}", resp.status());
+    let body = resp.text()?;
+    log::debug!("Set torrent automatic management response: {}", body);
+
+    Ok(())
+}
 
 fn list_torrents() -> Result<Vec<TorrentInfo>, Box<dyn Error>> {
     log::debug!("Listing torrents");
@@ -270,7 +338,7 @@ fn list_torrents() -> Result<Vec<TorrentInfo>, Box<dyn Error>> {
     Ok(list_torrents)
 }
 
-pub fn download_items(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn Error>> {
+pub fn download_items(items: &Vec<AnimeSeasonItem>, move_existing: bool) -> Result<(), Box<dyn Error>> {
     let downloader_torrents = list_torrents()?;
     let downloader_hash: HashSet<String> = downloader_torrents.iter().map(|x| x.hash.clone()).collect();
     let mut library_hash: HashSet<String> = HashSet::new();
@@ -282,9 +350,20 @@ pub fn download_items(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn Error>
         library_hash_to_item.insert(hash.to_string(), item.clone());
     }
     let hash_to_download = library_hash.difference(&downloader_hash).collect::<HashSet<&String>>();
+    let hash_to_move = downloader_hash.intersection(&library_hash).collect::<HashSet<&String>>();
+    if move_existing {
+        for hash in hash_to_move {
+            let item = library_hash_to_item.get(hash).unwrap();
+            set_torrent_automatic_management(item, false)
+                .and_then(|_| move_torrent_item(item))
+                .and_then(|_| set_torrent_category(item))
+                .and_then(|_| add_torrent_tags(item))
+                .unwrap_or(());  // ignore error, continue to next torrent
+        }
+    }
     let items_to_download = hash_to_download.iter().map(|x| library_hash_to_item.get(*x).unwrap()).collect::<Vec<&AnimeSeasonItem>>();
     for item in items_to_download {
-        add_torrent_item(item)?;
+        add_torrent_item(item).unwrap_or(());  // ignore error, continue to next
     }
     Ok(())
 }
@@ -309,52 +388,98 @@ fn get_fileinfo(hash: &String) -> Result<Vec<TorrentFile>, Box<dyn Error>> {
     let list_files: Vec<TorrentFile> = serde_json::from_str(&body)?;
     Ok(list_files)
 }
-// 
-// pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn std::error::Error>> {
-//     let config = get_config();
-//     let hash_to_item: HashMap<String, AnimeSeasonItem> = items.iter().map(|x| {
-//         let hash = x.mikan_item_magnet_link.split("btih:").last().unwrap();
-//         let hash = hash.split("&").next().unwrap();
-//         (hash.to_string(), x.clone())
-//     }).collect();
-//     let downloader_torrents = list_torrents()?;
-//     let downloader_torrents_file_info: HashMap<String, Vec<TorrentFile>> =
-//         downloader_torrents.iter().map(|x| (x.hash.clone(), get_fileinfo(&x.hash).unwrap())).collect();
-//     // For each file, rename if SxxxExxx(x might be >=2 digits) not in filename
-//     let regex = fancy_regex::Regex::new(r"S\d{2,}E\d{2,}").unwrap();
-//     for (hash, files) in downloader_torrents_file_info {
-//         let item = hash_to_item.get(&hash).unwrap();
-//         for file in files {
-//             // If match, continue
-//             if regex.is_match(&file.name).unwrap() {
-//                 continue;
-//             }
-//             // If not match, rename
-//             let old_path = file.name;
-//             // mikan_subject_title SxxExx.xxx
-//             let new_path = format!(
-//                 // "{} S{:02}E{:02}.{}",
-//                 "{} S01E{:02}.{}",
-//                 item.mikan_subject_name,
-//                 item.episode_num_offseted,
-//                 old_path.split(".").last().unwrap(),
-//             );
-//             log::debug!("Renaming file: {} -> {}", old_path, new_path);
-//             // url encode
-//             let old_path = urlencoding::encode(&old_path);
-//             let new_path = urlencoding::encode(&new_path);
-//             relogin_if_needed()?;
-//             let url = format!("http://{}:{}/api/v2/torrents/renameFile", config.host, config.port);
-//             // POST
-//             // hash={}&f={}&n={}
-//             log::debug!("Rename file response status: {}", resp.status());
-//             let body = resp.text()?;
-//             log::debug!("Rename file response: {}", body);
-//         }
-//     }
-// 
-//     Ok(())
-// }
+
+fn rename_file(hash: &String, old_path: &String, new_path: &String) -> Result<(), Box<dyn Error>> {
+    log::debug!("Renaming file");
+    let config = get_config();
+    relogin_if_needed()?;
+    let url = format!("http://{}:{}/api/v2/torrents/renameFile", config.host, config.port);
+    // application/x-www-form-urlencoded
+    let old_path = urlencoding::encode(&old_path);
+    let new_path = urlencoding::encode(&new_path);
+    let body = format!("hash={}&oldPath={}&newPath={}", hash, old_path, new_path);
+    let cookie = &DOWNLOADER.read().unwrap().cookie.clone();
+    let resp = DOWNLOADER.write().unwrap().client.post(&url)
+        .header("Referer", format!("http://{}:{}", config.host, config.port))
+        .header("Origin", format!("http://{}:{}", config.host, config.port))
+        .header("Cookie", cookie)
+        .header("Content-Type", "application/x-www-form-urlencoded")
+        .body(body)
+        .send()?;
+    log::debug!("Rename file response status: {}", resp.status());
+    let body = resp.text()?;
+    log::debug!("Rename file response: {}", body);
+
+    Ok(())
+}
+
+pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn Error>> {
+    let hash_to_item: HashMap<String, AnimeSeasonItem> = items.iter().map(|x| {
+        let hash = maglink_to_hash(&x.mikan_item_magnet_link);
+        (hash.to_string(), x.clone())
+    }).collect();
+    let downloader_torrents = list_torrents()?;
+    let mut downloader_torrents_file_info: HashMap<String, Vec<TorrentFile>> =
+        downloader_torrents.iter().map(|x| (x.hash.clone(), get_fileinfo(&x.hash).unwrap())).collect();
+    
+    // Assert all torrents in downloader_torrents_file_info have only one file
+    // Otherwide pop it out
+    let mut to_remove = Vec::new();
+    for (hash, files) in downloader_torrents_file_info.iter() {
+        if files.len() != 1 {
+            log::warn!("Torrent {} has more than one file, pop it out", hash);
+            to_remove.push(hash.clone());
+        }
+    }
+    for hash in to_remove {
+        downloader_torrents_file_info.remove(&hash);
+    }
+    // Leave only file name
+    let downloader_torrents_file_name = downloader_torrents_file_info.iter().map(|(hash, files)| {
+        (hash.clone(), files[0].name.clone())
+    }).collect::<HashMap<String, String>>();
+    
+    // For each torrent, get item info from hash_to_item and construct an ideal filename
+    // (If not appear in hash_to_item, skip and ignore it)
+    // Then compare with the filename in downloader_torrents_file_info
+    // If not match, rename it
+    for (hash, old_name) in downloader_torrents_file_name.iter() {
+        let item = match hash_to_item.get(hash) {
+            Some(item) => item,
+            None => continue,
+        };
+        let series_info = item_to_series_info(item);
+        
+        let series_name = match &series_info {
+            Some(series_info) => series_info.disp_series_name.clone(),
+            None => match item.tmdb_series_name.as_str() {
+                "" => item.mikan_subject_name.clone(),
+                _ => item.tmdb_series_name.clone(),
+            }
+        };
+        let season_num = match series_info {
+            Some(series_info) => series_info.disp_season_num,
+            None => match item.tmdb_parsed_season_num {
+                -1 => item.bangumi_parsed_season_num,
+                _ => item.tmdb_parsed_season_num,
+            }
+        };
+        
+        let new_name = format!(
+            "{} S{:02}E{:02}.{}",
+            series_name,
+            season_num,
+            item.mikan_parsed_episode_num,
+            old_name.split(".").last().unwrap(),
+        );
+        if *old_name != new_name {
+            log::debug!("Renaming file: {} -> {}", old_name, new_name);
+            rename_file(&hash, old_name, &new_name).unwrap_or(());
+        }
+    }
+    
+    Ok(())
+}
 
 #[cfg(test)]
 mod tests {
@@ -374,6 +499,24 @@ mod tests {
         let cookie = DOWNLOADER.read().unwrap().cookie.clone();
         assert!(!cookie.is_empty());
     }
+
+    #[test]
+    fn test_get_fileinfo() {
+        logger::init();
+        login().unwrap();
+        let files = get_fileinfo(&"007c84bc9bcb28fa779ef7567e4a17c8a896d51d".to_string()).unwrap();
+        println!("{:?}", files);
+    }
+    
+    #[test]
+    fn test_rename_file() {
+        logger::init();
+        login().unwrap();
+        rename_file(&"007c84bc9bcb28fa779ef7567e4a17c8a896d51d".to_string(), 
+                    &"[ANi] 極速星舞 - 03 [1080P][Baha][WEB-DL][AAC AVC][CHT].mp4".to_string(), 
+                    &"極速星舞 - S01E03.mp4".to_string()).unwrap();
+    }
+
     //
     // #[test]
     // fn test_add_torrent() {

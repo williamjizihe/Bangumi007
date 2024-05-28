@@ -11,7 +11,7 @@ pub fn update_library(items: &Vec<rss::MikanItem>) {
     // If the season is not found, insert the season into the database
 
     for item in items {
-        // If the season is not found, insert the season into the database
+        // season in library
         if let Some(season) = read_season_info(item.mikan_subject_id, item.mikan_subgroup_id) {
             // If the season is found, insert the item into the database if the item obeys the language and codec restriction
             // TODO: RSS parser parse only the language and codec configured
@@ -21,7 +21,7 @@ pub fn update_library(items: &Vec<rss::MikanItem>) {
                 }
             }
         } else {
-            // If the season is not found, insert the season into the database
+            // season in rss cache
             let season_cache = rss::fetch_mikan_subject_info(item.mikan_subject_id);
             match season_cache {
                 Some(season) => {

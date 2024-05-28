@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 use std::error::Error;
+use std::thread::sleep;
 
 use fancy_regex::Regex;
 use html_escape::decode_html_entities;
@@ -204,16 +205,24 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
     // Then insert the item into the database
     let items_not_in_db = filter_uncached_items(&result);
     for item in items_not_in_db {
-        let item = retry(Fixed::from_millis(5000), || {
+        let mut count = 0;
+        let item = loop {
             match fill_episode_information(&item) {
-                Ok(item) => Ok(item),
+                Ok(item) => break Ok(item),
                 Err(_) => {
-                    log::warn!("Failed to parse episode info");
-                    Err("Failed to parse episode info")
+                    count += 1;
+                    sleep(std::time::Duration::from_secs(5));
+                    if count > 10 {
+                        log::warn!("Failed to parse episode info");
+                        break Err(new_err("Failed to parse episode info"));
+                    }
                 }
             }
-        }).unwrap();
-        insert_item_to_cache(&item).unwrap();
+        };
+        match item {
+            Ok(item) => insert_item_to_cache(&item).unwrap(),
+            Err(_) => continue
+        }
     }
     let items_full = fetch_cached_items(&result);
     Ok(items_full)
@@ -360,19 +369,15 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
             // 4. For failed season-num parses, try to find the name in TMDB Subject's Seasons.
 
             // 1. Parse Bangumi subject id
-            let bangumi_subject_id = bangumi_parser::get_bangumi_subject_id(mikan_subject_id).map_or(-1, |x| x);
+            let bangumi_subject_id = get_bangumi_subject_id(mikan_subject_id).map_or(-1, |x| x);
             log::debug!("Bangumi Subject ID: {}", bangumi_subject_id);
 
             // 2. Parse the season number using all the names fetched by Bangumi API
-            let bangumi_aliases = bangumi_parser::get_bangumi_subject_aliases(bangumi_subject_id);
-            let bangumi_season_num = match &bangumi_aliases {
-                Ok(aliases) => { parse_season_num_from_aliases(aliases) } // Parse
-                Err(_) => None
-            };
-            let bangumi_subject_name = match &bangumi_aliases {
-                Ok(aliases) => { aliases.iter().next().unwrap().clone() }
-                Err(_) => "".to_string()
-            };
+            let bangumi_subject_info = bangumi_parser::get_bangumi_subject(bangumi_subject_id)?;
+            
+            let bangumi_aliases = bangumi_subject_info.aliases;
+            let bangumi_season_num = bangumi_subject_info.season_num;
+            let bangumi_subject_name = bangumi_aliases.iter().next().unwrap().clone();
 
             // 3-4: Parse using TMDB API
             let tmdb_info = bangumi_parse_tmdb_info(bangumi_subject_id)
@@ -383,7 +388,7 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
                         mikan_subject_id,
                         bangumi_subject_id,
                         bangumi_subject_name,
-                        bangumi_season_num: bangumi_season_num.unwrap_or(-1),
+                        bangumi_season_num,
                         tmdb_series_id: tmdb_info.media_id as i32,
                         tmdb_series_name: tmdb_info.media_name,
                         tmdb_season_num: tmdb_info.season_number as i32,
@@ -398,7 +403,7 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
                     mikan_subject_id,
                     bangumi_subject_id,
                     bangumi_subject_name,
-                    bangumi_season_num: bangumi_season_num.unwrap_or(-1),
+                    bangumi_season_num,
                     tmdb_series_id: -1,
                     tmdb_series_name: "".to_string(),
                     tmdb_season_num: -1,
@@ -457,6 +462,52 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
         mikan_parsed_language: item.mikan_parsed_language.to_string(),
         mikan_parsed_codec: item.mikan_parsed_codec.to_string(),
     })
+}
+
+
+/// Get the Bangumi subject ID of the Mikanani subject
+///
+/// ## Input
+///
+/// Mikanani subject id : `i32`
+///
+/// ## Procedure
+///
+/// e.g. https://mikanani.me/Home/Bangumi/3344
+///
+/// 1. Visit the page https://mikanani.me/Home/Bangumi/3344
+/// 2. Parse the page and get the bangumi id & url https://bgm.tv/subject/444557
+///
+/// ## Output
+///
+/// Bangui subject id : `i32`
+pub fn get_bangumi_subject_id(mikan_subject_id: i32) -> rusqlite::Result<i32, Box<dyn Error>> {
+    // build url from item's uuid
+    let url = format!("https://mikanani.me/Home/Bangumi/{}", mikan_subject_id);
+
+    let response = retry::retry(Fixed::from_millis(5000), || {
+        match get(&url) {
+            Ok(response) => {
+                if response.status().is_success() {
+                    Ok(response.text().unwrap())
+                } else {
+                    Err(new_warn("Failed to get episode info, status code is not 200"))
+                }
+            }
+            Err(_) => Err(new_warn("Failed to get episode info"))
+        }
+    }).map_err(|_| new_err("Failed to get episode info"))?;
+
+    // Find the href="https://bgm.tv/subject/{444557}" substring and slice out 444557
+    let bgm_id = response.find("https://bgm.tv/subject/")
+        .ok_or_else(|| new_err("Failed to find bangumi url"))?;
+    let bgm_id = &response[bgm_id + 23..];
+    let bgm_id = bgm_id.split('\"').next()
+        .ok_or_else(|| new_err("Failed to find bangumi id"))?;
+    let bgm_id = bgm_id.parse::<i32>()
+        .map_err(|_| new_err("Failed to parse bangumi id"))?;
+
+    Ok(bgm_id)
 }
 
 

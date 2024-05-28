@@ -5,10 +5,60 @@ use log::trace;
 use retry::delay::Fixed;
 
 use crate::module::config::CONFIG;
-use crate::module::parser::bangumi_parser::get_bangumi_subject_aliases;
+use crate::module::parser::bangumi_parser::{get_bangumi_subject, get_bangumi_subject_aliases};
 use crate::module::utils::error::{new_err, new_warn};
 
-pub fn tmdb_search_media(series_name: &str) -> rusqlite::Result<(String, i64), Box<dyn Error>> {
+
+pub fn tmdb_search_tv(series_name: &str) -> rusqlite::Result<i64, Box<dyn Error>> {
+
+    // curl --request GET \
+    //      --url 'https://api.themoviedb.org/3/search/multi?query={name}&include_adult=false&language=en-US&page=1' \
+    //      --header 'Authorization: Bearer {Access Token Auth}' \
+    //      --header 'accept: application/json'
+
+    let api_access_token_auth = CONFIG.read().unwrap().parser_config.tmdb_config.api_access_token_auth.clone();
+    let include_adult = CONFIG.read().unwrap().parser_config.tmdb_config.include_adult;
+
+    let url = format!("https://api.themoviedb.org/3/search/tv?query={}&include_adult={}&language=zh-CN", series_name, include_adult);
+
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert("Authorization", format!("Bearer {}", api_access_token_auth).parse().unwrap());
+    headers.insert("accept", "application/json".parse().unwrap());
+
+    let response = retry::retry(Fixed::from_millis(5000), || {
+        match reqwest::blocking::Client::new().get(&url).headers(headers.clone()).send() {
+            Ok(response) => {
+                if response.status().is_success() {
+                    Ok(response.text().unwrap())
+                } else {
+                    Err(new_warn(format!("Failed to get tmdb media info, status code is {}", response.status()).as_str()))
+                }
+            }
+            Err(_) => Err(new_warn("Failed to get tmdb media info"))
+        }
+    }).map_err(|_| new_err("Failed to get tmdb media info"))?;
+
+    // Parse json
+    let json: serde_json::Value = serde_json::from_str(&response)
+        .map_err(|_| new_err("Failed to parse json"))?;
+
+    // Get json['results'][0]['id'] and json['results'][0]['media_type']
+    let first_result = json.get("results")
+        .ok_or_else(|| new_err("Failed to get results"))?
+        .as_array()
+        .ok_or_else(|| new_err("Failed to get results as array"))?
+        .get(0)
+        .ok_or_else(|| new_warn(format!("TMDB Search result empty for {}", series_name).as_str()))?;
+
+    let media_id = first_result.get("id")
+        .ok_or_else(|| new_err("Failed to get id"))?
+        .as_i64()
+        .ok_or_else(|| new_err("Failed to get id as i64"))?;
+
+    Ok(media_id)
+}
+
+pub fn tmdb_search_multi(series_name: &str) -> rusqlite::Result<(String, i64), Box<dyn Error>> {
 
     // curl --request GET \
     //      --url 'https://api.themoviedb.org/3/search/multi?query={name}&include_adult=false&language=en-US&page=1' \
@@ -70,8 +120,8 @@ fn tmdb_get_media_info_internal(media_type: &str, media_id: i64, lang: &str) -> 
 
     let api_access_token_auth = CONFIG.read().unwrap().parser_config.tmdb_config.api_access_token_auth.clone();
 
-    let url = format!("https://api.themoviedb.org/3/{}/{}?language={}", media_type, media_id, lang);
 
+    let url = format!("https://api.themoviedb.org/3/{}/{}?language={}", media_type, media_id, lang);
     let mut headers = reqwest::header::HeaderMap::new();
     headers.insert("Authorization", format!("Bearer {}", api_access_token_auth).parse().unwrap());
     headers.insert("accept", "application/json".parse().unwrap());
@@ -245,14 +295,18 @@ pub struct TMDBParseResult {
 }
 
 pub fn bangumi_parse_tmdb_info(bangumi_subject_id: i32) -> Result<TMDBParseResult, Box<dyn Error>> {
-    let aliases = get_bangumi_subject_aliases(bangumi_subject_id)?;
+    let bangumi_info = get_bangumi_subject(bangumi_subject_id)?;
+    let aliases = bangumi_info.aliases;
+    if bangumi_info.media_type == "剧场版" || bangumi_info.media_type == "OVA" {
+        return Err(new_err(format!("Media type is {}. Not implemented.", bangumi_info.media_type).as_str()));
+    }
     // For each alias, search in tmdb
     // If found, get media_name and season_number
     // If Err, continue to next alias
     let mut alias_id = 0;
     let search_result = loop {
         let alias = &aliases[alias_id];
-        let result = tmdb_search_media(alias);
+        let result = tmdb_search_tv(alias);
         if result.is_ok() {
             break result;
         }
@@ -267,8 +321,10 @@ pub fn bangumi_parse_tmdb_info(bangumi_subject_id: i32) -> Result<TMDBParseResul
             let mut alias_id = 0;
             let search_result = loop {
                 // only take the first half of the alias
-                let alias = &aliases[alias_id][..aliases[alias_id].len() / 2];
-                let result = tmdb_search_media(alias);
+                let char_count = aliases[alias_id].chars().count();
+                // let alias = &aliases[alias_id][..char_count / 2];
+                let alias = &aliases[alias_id].chars().take(char_count / 2).collect::<String>();
+                let result = tmdb_search_tv(alias);
                 if result.is_ok() {
                     break result;
                 }
@@ -280,8 +336,8 @@ pub fn bangumi_parse_tmdb_info(bangumi_subject_id: i32) -> Result<TMDBParseResul
             search_result
         }
     };
-    let (media_type, media_id) = search_result?;
-    let media_infos = tmdb_get_media_info(&media_type, media_id)?;
+    let media_id = search_result?;
+    let media_infos = tmdb_get_media_info("tv", media_id)?;
     let media_name = tmdb_parse_media_name(&media_infos["zh-CN"])?;
     let (season_number, season_name) = tmdb_search_season_in_infos(&media_infos, &aliases)?;
 
@@ -308,7 +364,7 @@ mod tests {
     fn test_tmdb_search_media() {
         logger::init();
         let series_name = "異世界魔王と召喚少女の奴隷魔術Ω";
-        let result = tmdb_search_media(series_name);
+        let result = tmdb_search_tv(series_name);
         assert!(result.is_ok());
         println!("{:?}", result.unwrap());
     }
@@ -325,18 +381,18 @@ mod tests {
 
     #[test]
     fn test_tmdb() {
-        // Parse 异世界魔王与召唤少女的奴隶魔术OMEGA
         logger::init();
-        let bangumi_ids = vec![342667, ];     //285666, 303864, 444557, 208908, 455345, 425978, 455835, 416777, 350235, 364522
+        let bangumi_ids = vec![283643, ];     //285666, 303864, 444557, 208908, 455345, 425978, 455835, 416777, 350235, 364522, 342667
         for bangumi_id in bangumi_ids {
-            let aliases = get_bangumi_subject_aliases(bangumi_id).unwrap();
+            let bangumi_subject = get_bangumi_subject(bangumi_id).unwrap();
+            let aliases = bangumi_subject.aliases;
             // For each alias, search in tmdb
             // If found, get media_name and season_number
             // If Err, continue to next alias
             let mut alias_id = 0;
             let search_result = loop {
                 let alias = &aliases[alias_id];
-                let result = tmdb_search_media(alias);
+                let result = tmdb_search_tv(alias);
                 if result.is_ok() {
                     break result;
                 }
@@ -351,8 +407,10 @@ mod tests {
                     let mut alias_id = 0;
                     let search_result = loop {
                         // only take the first half of the alias
-                        let alias = &aliases[alias_id][..aliases[alias_id].len() / 2];
-                        let result = tmdb_search_media(alias);
+                        let char_count = aliases[alias_id].chars().count();
+                        // let alias = &aliases[alias_id][..char_count / 2];
+                        let alias = &aliases[alias_id].chars().take(char_count / 2).collect::<String>();
+                        let result = tmdb_search_tv(alias);
                         if result.is_ok() {
                             break result;
                         }
@@ -364,8 +422,8 @@ mod tests {
                     search_result
                 }
             };
-            let (media_type, media_id) = search_result.unwrap();
-            let media_infos = tmdb_get_media_info(&media_type, media_id).unwrap();
+            let media_id = search_result.unwrap();
+            let media_infos = tmdb_get_media_info("tv", media_id).unwrap();
             let media_name = tmdb_parse_media_name(&media_infos["zh-CN"]).unwrap();
             let (season_number, season_name) = tmdb_search_season_in_infos(&media_infos, &aliases).unwrap();
 

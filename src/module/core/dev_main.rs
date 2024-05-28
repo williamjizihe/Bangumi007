@@ -1,6 +1,6 @@
 use crate::module::core::init::run_init;
-use crate::module::database::library::{read_season_items, read_seasons};
-use crate::module::downloader::qbittorrent::download_items;
+use crate::module::database::library::{read_all_items, read_season_items, read_seasons};
+use crate::module::downloader::qbittorrent::{download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
 
@@ -14,7 +14,7 @@ pub fn run() {
         if rss.active {
             let items = update_rss(&*rss.url).unwrap();
             // By default, only incremental, not expanding the history
-            let items = expand_history_episodes(items);
+            // let items = expand_history_episodes(items);
             update_library(&items);
         }
     }
@@ -31,6 +31,7 @@ pub fn run() {
         println!();
     }
     // Add torrents to downloader
-    // let library_items = read_all_items();
-    // download_items(&library_items).unwrap();
+    let library_items = read_all_items();
+    download_items(&library_items, true).unwrap();
+    rename_torrents_files(&library_items).unwrap();
 }
