@@ -27,7 +27,7 @@ image = { version = "0.25.1", default-features = false, features = ["png", "jpeg
 
 [dependencies.egui_extras]
 workspace = true
-features = ["default", "image"]
+features = ["default", "image", "all_loaders"]
 
 [dependencies.eframe]
 workspace = true

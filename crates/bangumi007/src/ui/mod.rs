@@ -1,1 +1,2 @@
-pub mod helloworld;
+pub mod mainapp;
+mod panels;
