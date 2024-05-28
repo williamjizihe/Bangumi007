@@ -518,6 +518,7 @@ dependencies = [
  "egui_extras",
  "fancy-regex 0.13.0",
  "html-escape",
+ "image",
  "lazy_static",
  "log",
  "log4rs",

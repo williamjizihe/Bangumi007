@@ -1,9 +1,14 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![cfg_attr(
+    not(debug_assertions),
+    windows_subsystem = "windows"
+)] // hide console window on Windows in release
+
+use log4rs::append::Append;
 
 use eframe::egui;
-use eframe::egui::ecolor;
+use eframe::egui::{ecolor, Vec2};
+
 use crate::module::core::init::run_init;
-use crate::module::logger;
 
 pub(crate) fn ui_main() -> Result<(), eframe::Error> {
     run_init().unwrap();
@@ -17,7 +22,7 @@ pub(crate) fn ui_main() -> Result<(), eframe::Error> {
         Box::new(|cc| {
             // This gives us image support:
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Box::new(MyApp::new(cc))
+            Box::new(MainApp::new(cc))
         }),
     )
 }
@@ -50,7 +55,10 @@ fn load_fonts(ctx: &egui::Context) {
     ctx.set_fonts(fonts);
 }
 
-impl MyApp {
+// ----------------------------------------------------------------------------
+// Main App
+
+impl MainApp {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
         load_fonts(&cc.egui_ctx);
         let mut visuals = egui::Visuals::dark();
@@ -61,7 +69,7 @@ impl MyApp {
 }
 
 
-impl Default for MyApp {
+impl Default for MainApp {
     fn default() -> Self {
         Self {
             library_app: LibraryApp::default(),
@@ -73,6 +81,7 @@ impl Default for MyApp {
 }
 
 // ----------------------------------------------------------------------------
+// Panels
 
 #[derive(PartialEq, Eq)]
 enum Panel {
@@ -88,11 +97,28 @@ impl Default for Panel {
 }
 
 // ----------------------------------------------------------------------------
+// Data structure of media library
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct AppAnimeEpisode {
+    episode_hash: String,
+    disp_episode_num: i32,
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct AppAnimeSeason {
+    mikan_subject_id: i32,
+    mikan_subgroup_id: i32,
+    disp_season_name: String,
+    disp_season_num: i32,
+    disp_thumbnail_url: String,
+    episodes: Vec<AppAnimeEpisode>,
+}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 struct AppAnimeSeries {
-    name: String,
-    episodes: Vec<String>,
+    disp_series_name: String,
+    seasons: Vec<AppAnimeSeason>,
 }
 
 // ----------------------------------------------------------------------------
@@ -102,35 +128,189 @@ struct LibraryApp {
     library: Vec<AppAnimeSeries>,
 }
 
+fn series_layout(ui: &mut egui::Ui, series: &AppAnimeSeries) {
+    ui.heading("NEW GAME!");
+    ui.add_space(3.);
+    for season in &series.seasons {
+        ui.horizontal(|ui| {
+            ui.add(
+                egui::Image::new(egui::include_image!("../../../../assets/150775.jpg"))
+                    .fit_to_exact_size(Vec2::new(60., 60.))
+                    .show_loading_spinner(true)
+                    .rounding(5.),
+            );
+            ui.vertical(|ui| {
+                ui.heading(format!("S{:02} - {}", season.disp_season_num,
+                    season.disp_season_name).to_string());
+                ui.columns(13, |cols| {
+                    let mut count_epi = 0;
+                    for episode in &season.episodes {
+                        // small button with small text (rich text)
+                        let button = cols[count_epi].small_button("  ".to_string());
+                        count_epi = (count_epi + 1) % 13;
+                    }
+                });
+            });
+        });
+    }
+}
+
 impl LibraryApp {
     fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("媒体库");
-            ui.add_space(5.0);
-            ui.separator();
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("动画系列");
-            ui.add_space(5.0);
-            ui.separator();
-        });
-
-        for series in &mut self.library {
-            ui.horizontal(|ui| {
-                ui.label(&series.name);
-                ui.add_space(5.0);
-                ui.separator();
+        if self.library.is_empty() {
+            self.library.push(
+                AppAnimeSeries {
+                    disp_series_name: "NEW GAME".to_string(),
+                    seasons: vec![
+                        AppAnimeSeason {
+                            mikan_subject_id: 295017,
+                            mikan_subgroup_id: 90,
+                            disp_season_name: "NEW GAME!".to_string(),
+                            disp_season_num: 1,
+                            disp_thumbnail_url: "https://lain.bgm.tv/pic/cover/c/0f/79/150775_rRSAT.jpg".to_string(),
+                            episodes: vec![
+                                AppAnimeEpisode {
+                                    episode_hash: "1".to_string(),
+                                    disp_episode_num: 1,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "2".to_string(),
+                                    disp_episode_num: 2,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "3".to_string(),
+                                    disp_episode_num: 3,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "4".to_string(),
+                                    disp_episode_num: 4,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "5".to_string(),
+                                    disp_episode_num: 5,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "6".to_string(),
+                                    disp_episode_num: 6,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "7".to_string(),
+                                    disp_episode_num: 7,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "8".to_string(),
+                                    disp_episode_num: 8,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "9".to_string(),
+                                    disp_episode_num: 9,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "10".to_string(),
+                                    disp_episode_num: 10,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "11".to_string(),
+                                    disp_episode_num: 11,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "12".to_string(),
+                                    disp_episode_num: 12,
+                                },
+                            ],
+                        },
+                        AppAnimeSeason {
+                            mikan_subject_id: 295017,
+                            mikan_subgroup_id: 90,
+                            disp_season_name: "NEW GAME!!".to_string(),
+                            disp_season_num: 2,
+                            disp_thumbnail_url: "https://lain.bgm.tv/pic/cover/c/32/44/208908_AATp0.jpg".to_string(),
+                            episodes: vec![
+                                AppAnimeEpisode {
+                                    episode_hash: "1".to_string(),
+                                    disp_episode_num: 1,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "2".to_string(),
+                                    disp_episode_num: 2,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "3".to_string(),
+                                    disp_episode_num: 3,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "4".to_string(),
+                                    disp_episode_num: 4,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "5".to_string(),
+                                    disp_episode_num: 5,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "6".to_string(),
+                                    disp_episode_num: 6,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "7".to_string(),
+                                    disp_episode_num: 7,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "8".to_string(),
+                                    disp_episode_num: 8,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "9".to_string(),
+                                    disp_episode_num: 9,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "10".to_string(),
+                                    disp_episode_num: 10,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "11".to_string(),
+                                    disp_episode_num: 11,
+                                },
+                                AppAnimeEpisode {
+                                    episode_hash: "12".to_string(),
+                                    disp_episode_num: 12,
+                                },
+                            ],
+                        },
+                    ],
+                }
+            );
+            ui.centered_and_justified(|ui| {
+                ui.label("媒体库为空");
             });
-
-            for episode in &series.episodes {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(episode));
-                    ui.add_space(5.0);
-                    ui.separator();
-                });
-            }
+            return;
         }
+        ui.columns(2, |cols| {
+            let mut count = 0;
+            for series in &mut self.library {
+                series_layout(&mut cols[count], series);
+                // cols[count].label(&series.disp_series_name);
+                // cols[count].add(
+                //     egui::Image::new(egui::include_image!("../../../../assets/150775.jpg"))
+                //         .fit_to_exact_size(Vec2::new(100., 100.))
+                //         .show_loading_spinner(true)
+                //         .rounding(5.),
+                // );
+                // cols[0].label(format!("S{:02} - {}",
+                //                       series.seasons[0].disp_season_num,
+                //                       series.seasons[0].disp_season_name
+                // ));
+                // cols[0].columns(12, |cols| {
+                //     let mut count_epi = 0;
+                //     for episode in &series.seasons[0].episodes {
+                //         // small button with small text (rich text)
+                //         let button = cols[count_epi].small_button(episode.disp_episode_num.to_string());
+                //
+                //         count_epi = (count_epi + 1) % 12;
+                //     }
+                // });
+                count = (count + 1) % 2;
+            }
+        })
     }
 }
 
@@ -142,35 +322,7 @@ struct LogApp {
 }
 
 impl LogApp {
-    fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("日志");
-            ui.add_space(5.0);
-            ui.separator();
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("动画系列");
-            ui.add_space(5.0);
-            ui.separator();
-        });
-
-        for series in &mut self.library {
-            ui.horizontal(|ui| {
-                ui.label(&series.name);
-                ui.add_space(5.0);
-                ui.separator();
-            });
-
-            for episode in &series.episodes {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(episode));
-                    ui.add_space(5.0);
-                    ui.separator();
-                });
-            }
-        }
-    }
+    fn ui(&mut self, ui: &mut egui::Ui) {}
 }
 
 // ----------------------------------------------------------------------------
@@ -181,41 +333,13 @@ struct SettingsApp {
 }
 
 impl SettingsApp {
-    fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal(|ui| {
-            ui.label("设置");
-            ui.add_space(5.0);
-            ui.separator();
-        });
-
-        ui.horizontal(|ui| {
-            ui.label("动画系列");
-            ui.add_space(5.0);
-            ui.separator();
-        });
-
-        for series in &mut self.library {
-            ui.horizontal(|ui| {
-                ui.label(&series.name);
-                ui.add_space(5.0);
-                ui.separator();
-            });
-
-            for episode in &series.episodes {
-                ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(episode));
-                    ui.add_space(5.0);
-                    ui.separator();
-                });
-            }
-        }
-    }
+    fn ui(&mut self, ui: &mut egui::Ui) {}
 }
 
 // ----------------------------------------------------------------------------
 
 #[derive(PartialEq)]
-pub struct MyApp {
+pub struct MainApp {
     library_app: LibraryApp,
     log_app: LogApp,
     settings_app: SettingsApp,
@@ -223,9 +347,8 @@ pub struct MyApp {
 }
 
 
-impl eframe::App for MyApp {
+impl eframe::App for MainApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(2.0);
             ui.horizontal(|ui| {
