@@ -22,12 +22,6 @@ pub(crate) fn ui_main() -> Result<(), eframe::Error> {
     )
 }
 
-struct MyApp {
-    name: String,
-    age: u32,
-    input_text: String,
-}
-
 fn load_fonts(ctx: &egui::Context) {
     let mut fonts = egui::FontDefinitions::default();
     fonts.font_data.insert("sourcehansans_sc".to_owned(),
@@ -70,49 +64,193 @@ impl MyApp {
 impl Default for MyApp {
     fn default() -> Self {
         Self {
-            name: "Arthur".to_owned(),
-            age: 42,
-            input_text: "Default text".to_owned(),
+            library_app: LibraryApp::default(),
+            log_app: LogApp::default(),
+            settings_app: SettingsApp::default(),
+            open_panel: Panel::default(),
         }
     }
 }
+
+// ----------------------------------------------------------------------------
+
+#[derive(PartialEq, Eq)]
+enum Panel {
+    Library,
+    Log,
+    Settings,
+}
+
+impl Default for Panel {
+    fn default() -> Self {
+        Self::Library
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct AppAnimeSeries {
+    name: String,
+    episodes: Vec<String>,
+}
+
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LibraryApp {
+    library: Vec<AppAnimeSeries>,
+}
+
+impl LibraryApp {
+    fn ui(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("媒体库");
+            ui.add_space(5.0);
+            ui.separator();
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("动画系列");
+            ui.add_space(5.0);
+            ui.separator();
+        });
+
+        for series in &mut self.library {
+            ui.horizontal(|ui| {
+                ui.label(&series.name);
+                ui.add_space(5.0);
+                ui.separator();
+            });
+
+            for episode in &series.episodes {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(episode));
+                    ui.add_space(5.0);
+                    ui.separator();
+                });
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct LogApp {
+    library: Vec<AppAnimeSeries>,
+}
+
+impl LogApp {
+    fn ui(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("日志");
+            ui.add_space(5.0);
+            ui.separator();
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("动画系列");
+            ui.add_space(5.0);
+            ui.separator();
+        });
+
+        for series in &mut self.library {
+            ui.horizontal(|ui| {
+                ui.label(&series.name);
+                ui.add_space(5.0);
+                ui.separator();
+            });
+
+            for episode in &series.episodes {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(episode));
+                    ui.add_space(5.0);
+                    ui.separator();
+                });
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Default, PartialEq)]
+struct SettingsApp {
+    library: Vec<AppAnimeSeries>,
+}
+
+impl SettingsApp {
+    fn ui(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            ui.label("设置");
+            ui.add_space(5.0);
+            ui.separator();
+        });
+
+        ui.horizontal(|ui| {
+            ui.label("动画系列");
+            ui.add_space(5.0);
+            ui.separator();
+        });
+
+        for series in &mut self.library {
+            ui.horizontal(|ui| {
+                ui.label(&series.name);
+                ui.add_space(5.0);
+                ui.separator();
+            });
+
+            for episode in &series.episodes {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(episode));
+                    ui.add_space(5.0);
+                    ui.separator();
+                });
+            }
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+
+#[derive(PartialEq)]
+pub struct MyApp {
+    library_app: LibraryApp,
+    log_app: LogApp,
+    settings_app: SettingsApp,
+    open_panel: Panel,
+}
+
 
 impl eframe::App for MyApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
 
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.add_space(2.0);
-            ui.heading("Bangumi007");
+            ui.horizontal(|ui| {
+                ui.add_space(3.0);
+                ui.heading("Bangumi007");
+                ui.add_space(5.0);
+                ui.selectable_value(&mut self.open_panel, Panel::Library, "媒体库");
+                ui.selectable_value(&mut self.open_panel, Panel::Log, "日志");
+                ui.selectable_value(&mut self.open_panel, Panel::Settings, "设置");
+            });
             ui.add_space(2.0);
+
             ui.separator();
-            ui.horizontal(|ui| {
-                ui.vertical(|ui| {
-                    ui.label("Hello World!");
-                    ui.label("This is a simple egui app.");
-                });
-                ui.separator();
-                ui.vertical(|ui| {
-                    ui.label("Hello World!");
-                    ui.label("This is a simple egui app.");
-                });
-            });
-            ui.horizontal(|ui| {
-                let name_label = ui.label("Your name: ");
-                ui.text_edit_singleline(&mut self.name)
-                    .labelled_by(name_label.id);
-            });
-            ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-            if ui.button("Increment").clicked() {
-                self.age += 1;
+
+            match self.open_panel {
+                Panel::Library => {
+                    self.library_app.ui(ui);
+                }
+                Panel::Log => {
+                    self.log_app.ui(ui);
+                }
+                Panel::Settings => {
+                    self.settings_app.ui(ui);
+                }
             }
-            ui.label(format!("Hello '{}', age {}", self.name, self.age));
-
-            ui.image(egui::include_image!(
-                "../../../../assets/ferris.png"
-            ));
-
-            ui.text_edit_multiline(&mut self.input_text);
-
         });
     }
 }
