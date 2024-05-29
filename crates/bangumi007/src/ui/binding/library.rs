@@ -4,7 +4,7 @@ use crate::module::database::library::{AnimeSeason, read_all_items, read_season_
 use crate::module::downloader::qbittorrent::{download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
-use crate::ui::panels::libraryapp::{AppAnimeSeason, AppAnimeSeries, LibraryApp};
+use crate::ui::apps::libraryapp::{AppAnimeSeason, AppAnimeSeries, LibraryApp};
 
 impl LibraryApp {
     pub fn update_rss(&mut self) {
@@ -33,7 +33,7 @@ impl LibraryApp {
                 if rss.active {
                     let items = update_rss(&*rss.url).unwrap();
                     // By default, only incremental, not expanding the history
-                    let items = expand_history_episodes(items);
+                    // let items = expand_history_episodes(items);
                     update_library(&items);
                 }
             }
@@ -41,6 +41,7 @@ impl LibraryApp {
             // Rearrange the media library
             auto_season_config_clean();
 
+            *library = Vec::new();
             // Output media library
             let seasons = read_seasons();
             // Season arrange by series name
@@ -58,9 +59,9 @@ impl LibraryApp {
                     disp_series_name: series,
                     seasons: Vec::new(),
                 };
-                for season in seasons {
+                for season in &seasons {
                     let season_episodes = read_season_items(season.mikan_subject_id, season.mikan_subgroup_id);
-                    let mut app_anime_season: AppAnimeSeason = season.into();
+                    let mut app_anime_season: AppAnimeSeason = <AnimeSeason as Clone>::clone(&(*season)).into();
                     for episode in season_episodes {
                         app_anime_season.episodes.push(episode.into());
                     }
@@ -72,6 +73,7 @@ impl LibraryApp {
                 series.seasons.sort_by(|a, b| a.disp_season_num.cmp(&b.disp_season_num));
                 (*library).push(series);
             }
+            library.sort_by(|a, b| a.disp_series_name.cmp(&b.disp_series_name));
 
             // for season in read_seasons() {
             //     println!("Season: {:?}", season.mikan_subject_name);
@@ -111,6 +113,7 @@ impl LibraryApp {
 
             log::info!("Start updating library");
 
+            *library = Vec::new();
             // Output media library
             let seasons = read_seasons();
             // Season arrange by series name
@@ -142,6 +145,7 @@ impl LibraryApp {
                 series.seasons.sort_by(|a, b| a.disp_season_num.cmp(&b.disp_season_num));
                 (*library).push(series);
             }
+            library.sort_by(|a, b| a.disp_series_name.cmp(&b.disp_series_name));
 
             log::debug!("Library updated successfully.");
             drop(library);

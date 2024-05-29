@@ -1,3 +1,3 @@
 pub mod mainapp;
-mod panels;
+mod apps;
 mod binding;

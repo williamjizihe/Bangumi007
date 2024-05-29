@@ -192,7 +192,9 @@ fn item_to_savepath(item: &AnimeSeasonItem) -> String {
         }
     };
     let season_num = match season_info {
-        Some(season_info) => season_info.disp_season_num,
+        Some(season_info) => {
+            season_info.disp_season_num
+        }
         None => match item.tmdb_parsed_season_num {
             -1 => item.bangumi_parsed_season_num,
             _ => item.tmdb_parsed_season_num,
@@ -367,6 +369,7 @@ pub fn download_items(items: &Vec<AnimeSeasonItem>, move_existing: bool) -> Resu
     for item in items_to_download {
         add_torrent_item(item).unwrap_or(());  // ignore error, continue to next
     }
+
     Ok(())
 }
 
@@ -460,7 +463,9 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
             }
         };
         let season_num = match series_info {
-            Some(series_info) => series_info.disp_season_num,
+            Some(series_info) => {
+                series_info.disp_season_num
+            },
             None => match item.tmdb_parsed_season_num {
                 -1 => item.bangumi_parsed_season_num,
                 _ => item.tmdb_parsed_season_num,
@@ -471,7 +476,7 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
             "{} S{:02}E{:02}.{}",
             series_name,
             season_num,
-            item.mikan_parsed_episode_num,
+            item.disp_episode_num,
             old_name.split(".").last().unwrap(),
         );
         if *old_name != new_name {

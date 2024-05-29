@@ -2,7 +2,7 @@ use eframe::egui;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct LogApp {
-    library: Vec<crate::ui::panels::libraryapp::AppAnimeSeries>,
+    library: Vec<crate::ui::apps::libraryapp::AppAnimeSeries>,
 }
 
 impl LogApp {

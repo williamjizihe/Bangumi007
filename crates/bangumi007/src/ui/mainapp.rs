@@ -3,6 +3,8 @@
     windows_subsystem = "windows"
 )] // hide console window on Windows in release
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use log4rs::append::Append;
 
 use eframe::egui;
@@ -10,10 +12,11 @@ use eframe::egui::{Align, ecolor};
 
 use crate::module::core::init::run_init;
 use crate::ui::mainapp::egui::RichText;
-use crate::ui::panels::libraryapp::LibraryApp;
-use crate::ui::panels::logapp::LogApp;
-use crate::ui::panels::panel::Panel;
-use crate::ui::panels::settingsapp::SettingsApp;
+use crate::ui::apps::libraryapp::LibraryApp;
+use crate::ui::apps::logapp::LogApp;
+use crate::ui::apps::panel::Panel;
+use crate::ui::apps::season_conf_dialog_window::SeasonConfDialogWindow;
+use crate::ui::apps::settingsapp::SettingsApp;
 
 // use eframe::egui::WidgetText::RichText;
 
@@ -85,6 +88,7 @@ impl Default for MainApp {
             log_app: LogApp::default(),
             settings_app: SettingsApp::default(),
             open_panel: Panel::default(),
+            season_conf_dialog_window: Rc::new(RefCell::new(SeasonConfDialogWindow::new())),
         }
     }
 }
@@ -97,13 +101,13 @@ pub struct MainApp {
     pub library_app: LibraryApp,
     pub log_app: LogApp,
     pub settings_app: SettingsApp,
+    pub season_conf_dialog_window: Rc<RefCell<SeasonConfDialogWindow>>,
 }
 
 
 impl eframe::App for MainApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-
             // Title Bar
             ui.add_space(2.0);
             ui.horizontal(|ui| {
@@ -144,7 +148,7 @@ impl eframe::App for MainApp {
                 ui.add_space(3.0);
                 match self.open_panel {
                     Panel::Library => {
-                        self.library_app.ui(ui);
+                        self.library_app.ui(ui, self.season_conf_dialog_window.clone());
                     }
                     Panel::Log => {
                         self.log_app.ui(ui);
@@ -156,5 +160,20 @@ impl eframe::App for MainApp {
                 ui.add_space(3.0);
             });
         });
+        // egui::Window::new("hello world")
+        //     .default_width(200.0)
+        //     .default_height(200.0)
+        //     .open(&mut true)
+        //     .movable(false)
+        //     .resizable([false, false])
+        //     .show(ctx, |ui| {
+        //         // use super::View as _;
+        //         ui.label("Hello world!");
+        //     });
+        let mut season_conf_dialog_window = self.season_conf_dialog_window.borrow_mut();
+        if *season_conf_dialog_window.open.borrow() && season_conf_dialog_window.open_my {
+            let series = self.library_app.library.clone();
+            season_conf_dialog_window.show(ctx, series);
+        }
     }
 }

@@ -2,7 +2,7 @@
 
 use eframe::egui;
 
-use crate::ui::panels::libraryapp::AppAnimeSeries;
+use crate::ui::apps::libraryapp::AppAnimeSeries;
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct SettingsApp {

@@ -1,39 +1,60 @@
 // ----------------------------------------------------------------------------
 
+use std::cell::RefCell;
+use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use eframe::egui;
 use eframe::egui::{RichText, vec2};
+use eframe::egui::CursorIcon::PointingHand;
 
 use crate::module::database::library::AnimeSeason;
+use crate::ui::apps::season_conf_dialog_window::SeasonConfDialogWindow;
 
 #[derive(Debug, Clone, Default)]
 pub struct LibraryApp {
     pub library: Arc<RwLock<Vec<AppAnimeSeries>>>,
 }
 
-fn series_layout(ui: &mut egui::Ui, series: &AppAnimeSeries) {
+
+impl LibraryApp {
+
+    fn series_layout(&mut self, ui: &mut egui::Ui, series: &AppAnimeSeries, season_conf_dialog_window: Rc<RefCell<SeasonConfDialogWindow>>) {
         ui.add_space(3.);
         ui.vertical(|ui| {
             ui.add_space(3.);
-            ui.label(RichText::new(series.disp_series_name.clone()).size(16.0));
+            let title = ui.label(RichText::new(series.disp_series_name.clone()).size(16.0));
             for season in &series.seasons {
                 ui.add_space(8.);
                 ui.horizontal(|ui| {
-                    ui.add_sized(
+                    let season_image = ui.add_sized(
                         [51., 68.],
                         egui::Image::new(season.disp_thumbnail_url.clone())
-                        // egui::Image::new(egui::include_image!("../../../../../assets/150775.jpg"))
+                            // egui::Image::new(egui::include_image!("../../../../../assets/150775.jpg"))
                             .show_loading_spinner(true)
                             .rounding(5.),
                     );
+                    // if season_image.clicked() {
+                    //     let mut season_conf_dialog_window = season_conf_dialog_window.borrow_mut();
+                    //     season_conf_dialog_window.subject_id = season.mikan_subject_id;
+                    //     season_conf_dialog_window.subgroup_id = season.mikan_subgroup_id;
+                    //     season_conf_dialog_window.open = true;
+                    // }
                     ui.vertical(|ui| {
                         let mut disp_season_name = format!("第 {} 季", season.disp_season_num);
                         if disp_season_name != season.disp_season_name {
                             disp_season_name = format!("第 {} 季 - {}", season.disp_season_num,
-                                                           season.disp_season_name);
+                                                       season.disp_season_name);
                         }
-                        ui.heading(RichText::new(disp_season_name).size(14.0));
+                        let season_title = ui.heading(RichText::new(disp_season_name).size(14.0)).on_hover_cursor(PointingHand);
+                        if season_title.clicked() {
+                            let mut season_conf_dialog_window = season_conf_dialog_window.borrow_mut();
+                            season_conf_dialog_window.subject_id = season.mikan_subject_id;
+                            season_conf_dialog_window.subgroup_id = season.mikan_subgroup_id;
+                            *season_conf_dialog_window.open.borrow_mut() = true;
+                            season_conf_dialog_window.open_my = true;
+                            season_conf_dialog_window.inited = false;
+                        }
                         ui.add_space(3.);
                         ui.horizontal_wrapped(|ui| {
                             ui.style_mut().spacing.item_spacing = vec2(3.0, 3.0);
@@ -51,10 +72,10 @@ fn series_layout(ui: &mut egui::Ui, series: &AppAnimeSeries) {
             ui.add_space(7.);
             // ui.separator();      // Buggy separator
         });
-}
+    }
 
-impl LibraryApp {
-    pub fn ui(&mut self, ui: &mut egui::Ui) {
+    pub fn ui(&mut self, ui: &mut egui::Ui, season_conf_dialog_window: Rc<RefCell<SeasonConfDialogWindow>>) {
+
         let library = self.library.clone();
         let library = library.try_read();
         if library.is_err() {
@@ -86,7 +107,7 @@ impl LibraryApp {
                             // For the first half of the library
                             ui.vertical(|ui| {
                                 for series in &library[(col_index as f32 * library.len() as f32 / columns as f32).ceil() as usize..((col_index+1) as f32 * library.len() as f32 / columns as f32).ceil() as usize] {
-                                    series_layout(ui, series);
+                                    self.series_layout(ui, series, season_conf_dialog_window.clone());
                                 }
                             });
                             ui.add_space(2.);
@@ -115,6 +136,9 @@ pub struct AppAnimeSeason {
     pub disp_season_name: String,
     pub disp_season_num: i32,
     pub disp_thumbnail_url: String,
+    pub default_season_num: i32,
+    pub conf_season_num: i32,
+    pub conf_episode_offset: i32,
     pub episodes: Vec<AppAnimeEpisode>,
 }
 
@@ -133,7 +157,14 @@ impl From<AnimeSeason> for AppAnimeSeason {
             disp_season_name: season.disp_season_name,
             disp_season_num: season.disp_season_num,
             disp_thumbnail_url: season.mikan_subject_image,
+            default_season_num: if season.tmdb_season_num != -1 {
+                season.tmdb_season_num
+            } else {
+                season.bangumi_season_num
+            },
             episodes: vec![],
+            conf_episode_offset: season.conf_episode_offset,
+            conf_season_num: season.conf_season_num,
         }
     }
 }

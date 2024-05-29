@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use crate::module::database::cache::rss;
+use crate::module::database::cache::rss::MikanItem;
 use crate::module::database::get_connection;
 use crate::module::database::library::{AnimeSeason, create_item, create_season, delete_item, read_season_info, read_season_items, read_seasons};
 use crate::module::parser::mikan_parser;
@@ -15,11 +16,13 @@ pub fn update_library(items: &Vec<rss::MikanItem>) {
         if let Some(season) = read_season_info(item.mikan_subject_id, item.mikan_subgroup_id) {
             // If the season is found, insert the item into the database if the item obeys the language and codec restriction
             // TODO: RSS parser parse only the language and codec configured
-            if season.conf_language == "" || season.conf_language == item.mikan_parsed_language {
-                if season.conf_codec == "" || season.conf_codec == item.mikan_parsed_codec {
-                    create_item(&item);
-                }
+            if season.conf_language != "" && season.conf_language != item.mikan_parsed_language {
+                continue;
             }
+            if season.conf_codec != "" && season.conf_codec != item.mikan_parsed_codec {
+                continue;
+            }
+            create_item(&item); // episode offset logic inside.
         } else {
             // season in rss cache
             let season_cache = rss::fetch_mikan_subject_info(item.mikan_subject_id);
@@ -44,9 +47,6 @@ pub fn update_library(items: &Vec<rss::MikanItem>) {
                     // TODO: fetch subgroup name
                     let disp_subgroup_name = "字幕组名称".to_string();
                     // TODO: Parse episode offset between subgroup epinum and tmdb epinum
-                    let conf_episode_offset = 0;
-                    let conf_language = "".to_string();
-                    let conf_codec = "".to_string();
 
                     let season = AnimeSeason {
                         mikan_subject_id: item.mikan_subject_id,
@@ -66,9 +66,10 @@ pub fn update_library(items: &Vec<rss::MikanItem>) {
                         disp_season_name,
                         disp_subgroup_name,
                         disp_season_num,
-                        conf_episode_offset,
-                        conf_language,
-                        conf_codec,
+                        conf_episode_offset: 0,
+                        conf_language: "".to_string(),
+                        conf_codec: "".to_string(),
+                        conf_season_num: -1,
                     };
                     create_season(&season);
                     create_item(&item);

@@ -26,13 +26,14 @@ pub struct AnimeSeason {
     pub conf_episode_offset: i32,
     pub conf_language: String,
     pub conf_codec: String,
+    pub conf_season_num: i32,
 }
 
 #[deny(dead_code)]
 pub fn init_cache_library_anime_season_table(conn: &Connection) -> Result<(), Box<dyn Error>> {
     conn.execute(
         "create table if not exists library_anime_season (
-            mikan_subject_id integer primary key,
+            mikan_subject_id integer,
             mikan_subgroup_id integer,
             mikan_subject_name text,
             mikan_subject_image text,
@@ -51,7 +52,9 @@ pub fn init_cache_library_anime_season_table(conn: &Connection) -> Result<(), Bo
             disp_season_num integer,
             conf_episode_offset integer,
             conf_language text,
-            conf_codec text
+            conf_codec text,
+            conf_season_num integer default -1,
+            primary key(mikan_subject_id,mikan_subgroup_id) on conflict replace
         )",
         [],
     )?;
@@ -84,6 +87,7 @@ pub fn read_season_info(mikan_subject_id: i32, mikan_subgroup_id: i32) -> Option
             conf_episode_offset: row.get(17)?,
             conf_language: row.get(18)?,
             conf_codec: row.get(19)?,
+            conf_season_num: row.get(20)?,
         })
     }).unwrap();
 
@@ -117,8 +121,9 @@ pub fn create_season(season: &AnimeSeason) {
             disp_season_num,
             conf_episode_offset,
             conf_language,
-            conf_codec
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
+            conf_codec,
+            conf_season_num
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
         &[
             &season.mikan_subject_id.to_string(),
             &season.mikan_subgroup_id.to_string(),
@@ -140,6 +145,7 @@ pub fn create_season(season: &AnimeSeason) {
             &season.conf_episode_offset.to_string(),
             &season.conf_language,
             &season.conf_codec,
+            &season.conf_season_num.to_string(),
         ],
     ).unwrap();
 }
@@ -178,6 +184,7 @@ pub fn read_seasons() -> Vec<AnimeSeason> {
             conf_episode_offset: row.get(17)?,
             conf_language: row.get(18)?,
             conf_codec: row.get(19)?,
+            conf_season_num: row.get(20)?,
         })
     }).unwrap();
 
@@ -187,6 +194,62 @@ pub fn read_seasons() -> Vec<AnimeSeason> {
     }
 
     seasons
+}
+
+pub fn get_season_episode_offset(mikan_subject_id: i32, mikan_subgroup_id: i32) -> i32 {
+    let conn = get_connection().unwrap();
+    let mut stmt = conn.prepare("select conf_episode_offset from library_anime_season where mikan_subject_id = ?1 and mikan_subgroup_id = ?2").unwrap();
+    let offset_iter = stmt.query_map(&[&mikan_subject_id, &mikan_subgroup_id], |row| {
+        Ok(row.get(0)?)
+    }).unwrap();
+
+    for offset in offset_iter {
+        return offset.unwrap();
+    }
+
+    0
+}
+
+pub fn set_season_episode_offset(mikan_subject_id: i32, mikan_subgroup_id: i32, new_offset: i32) {
+    let conn = get_connection().unwrap();
+    conn.execute(
+        "update library_anime_season set conf_episode_offset = ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
+        &[&new_offset, &mikan_subject_id, &mikan_subgroup_id],
+    ).unwrap();
+    conn.execute(
+        "update library_anime_season_item set disp_episode_num = mikan_parsed_episode_num + ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
+        &[&new_offset, &mikan_subject_id, &mikan_subgroup_id],
+    ).unwrap();
+}
+
+pub fn get_season_conf_season_num(mikan_subject_id: i32, mikan_subgroup_id: i32) -> i32 {
+    let conn = get_connection().unwrap();
+    let mut stmt = conn.prepare("select conf_season_num from library_anime_season where mikan_subject_id = ?1 and mikan_subgroup_id = ?2").unwrap();
+    let conf_season_num_iter = stmt.query_map(&[&mikan_subject_id, &mikan_subgroup_id], |row| {
+        Ok(row.get(0)?)
+    }).unwrap();
+
+    for conf_season_num in conf_season_num_iter {
+        return conf_season_num.unwrap();
+    }
+
+    -1
+}
+
+pub fn set_season_conf_season_num(mikan_subject_id: i32, mikan_subgroup_id: i32, new_conf_season_num: i32) {
+    let conn = get_connection().unwrap();
+    conn.execute(
+        "update library_anime_season set conf_season_num = ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
+        &[&new_conf_season_num, &mikan_subject_id, &mikan_subgroup_id],
+    ).unwrap();
+}
+
+pub fn set_season_disp_season_num(mikan_subject_id: i32, mikan_subgroup_id: i32, new_disp_season_num: i32) {
+    let conn = get_connection().unwrap();
+    conn.execute(
+        "update library_anime_season set disp_season_num = ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
+        &[&new_disp_season_num, &mikan_subject_id, &mikan_subgroup_id],
+    ).unwrap();
 }
 
 
