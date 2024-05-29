@@ -105,10 +105,10 @@ impl AppConfig {
         // Load config from data/config/app_config.toml
         // If the file does not exist, make a new one with default values
         // If parse error, backup the old file and make a new one with default values
-        match std::fs::read_to_string("data/config/app_config.toml") {
+        match std::fs::read_to_string("./data/config/app_config.toml") {
             Err(_) => {
                 let default_config = AppConfig::default();
-                std::fs::write("data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
+                std::fs::write("./data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
                 if default_config.first_run {
                     panic!("Please manually configure the app_config.toml file");        // TODO: GUI first run setup
                 }
@@ -117,9 +117,9 @@ impl AppConfig {
             Ok(content) => {
                 toml::from_str(&content).unwrap_or_else(|_| {
                     let backup_file = format!("data/config/app_config.toml.{}.broken", chrono::Local::now().format("%Y%m%d%H%M%S"));
-                    std::fs::rename("data/config/app_config.toml", &backup_file).unwrap();
+                    std::fs::rename("./data/config/app_config.toml", &backup_file).unwrap();
                     let default_config = AppConfig::default();
-                    std::fs::write("data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
+                    std::fs::write("./data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
                     panic!("Please manually configure the app_config.toml file");        // TODO: GUI first run setup
                     // default_config
                 })

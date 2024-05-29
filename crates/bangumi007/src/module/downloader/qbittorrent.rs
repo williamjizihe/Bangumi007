@@ -183,7 +183,7 @@ fn item_to_series_info(item: &AnimeSeasonItem) -> Option<AnimeSeason> {
 fn item_to_savepath(item: &AnimeSeasonItem) -> String {
     let config = get_config();
     let season_info = read_season_info(item.mikan_subject_id, item.mikan_subgroup_id);
-    let series_name = match &season_info { 
+    let series_name = match &season_info {
         Some(season_info) => season_info.disp_series_name.clone(),
         None => match item.tmdb_series_name.as_str() {
             "" => item.mikan_subject_name.clone(),
@@ -421,7 +421,7 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
     let downloader_torrents = list_torrents()?;
     let mut downloader_torrents_file_info: HashMap<String, Vec<TorrentFile>> =
         downloader_torrents.iter().map(|x| (x.hash.clone(), get_fileinfo(&x.hash).unwrap())).collect();
-    
+
     // Assert all torrents in downloader_torrents_file_info have only one file
     // Otherwide pop it out
     let mut to_remove = Vec::new();
@@ -438,7 +438,7 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
     let downloader_torrents_file_name = downloader_torrents_file_info.iter().map(|(hash, files)| {
         (hash.clone(), files[0].name.clone())
     }).collect::<HashMap<String, String>>();
-    
+
     // For each torrent, get item info from hash_to_item and construct an ideal filename
     // (If not appear in hash_to_item, skip and ignore it)
     // Then compare with the filename in downloader_torrents_file_info
@@ -449,7 +449,7 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
             None => continue,
         };
         let series_info = item_to_series_info(item);
-        
+
         let series_name = match &series_info {
             Some(series_info) => series_info.disp_series_name.clone(),
             None => match item.tmdb_series_name.as_str() {
@@ -464,7 +464,7 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
                 _ => item.tmdb_parsed_season_num,
             }
         };
-        
+
         let new_name = format!(
             "{} S{:02}E{:02}.{}",
             series_name,
@@ -477,7 +477,7 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
             rename_file(&hash, old_name, &new_name).unwrap_or(());
         }
     }
-    
+
     Ok(())
 }
 
@@ -507,13 +507,13 @@ mod tests {
         let files = get_fileinfo(&"007c84bc9bcb28fa779ef7567e4a17c8a896d51d".to_string()).unwrap();
         println!("{:?}", files);
     }
-    
+
     #[test]
     fn test_rename_file() {
         logger::init();
         login().unwrap();
-        rename_file(&"007c84bc9bcb28fa779ef7567e4a17c8a896d51d".to_string(), 
-                    &"[ANi] 極速星舞 - 03 [1080P][Baha][WEB-DL][AAC AVC][CHT].mp4".to_string(), 
+        rename_file(&"007c84bc9bcb28fa779ef7567e4a17c8a896d51d".to_string(),
+                    &"[ANi] 極速星舞 - 03 [1080P][Baha][WEB-DL][AAC AVC][CHT].mp4".to_string(),
                     &"極速星舞 - S01E03.mp4".to_string()).unwrap();
     }
 

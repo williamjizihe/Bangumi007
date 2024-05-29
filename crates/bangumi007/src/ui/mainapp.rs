@@ -3,18 +3,19 @@
     windows_subsystem = "windows"
 )] // hide console window on Windows in release
 
-use crate::ui::mainapp::egui::RichText;
 use log4rs::append::Append;
 
 use eframe::egui;
-use eframe::egui::ecolor;
-// use eframe::egui::WidgetText::RichText;
+use eframe::egui::{Align, ecolor};
 
 use crate::module::core::init::run_init;
+use crate::ui::mainapp::egui::RichText;
 use crate::ui::panels::libraryapp::LibraryApp;
 use crate::ui::panels::logapp::LogApp;
 use crate::ui::panels::panel::Panel;
 use crate::ui::panels::settingsapp::SettingsApp;
+
+// use eframe::egui::WidgetText::RichText;
 
 pub fn ui_main() -> Result<(), eframe::Error> {
     run_init().unwrap();
@@ -70,7 +71,9 @@ impl MainApp {
         let mut visuals = egui::Visuals::dark();
         visuals.override_text_color = Some(ecolor::Color32::from_rgba_premultiplied(220, 220, 220, 255));
         &cc.egui_ctx.set_visuals(visuals);
-        Self::default()
+        let mut app = Self::default();
+        app.library_app.update_library();
+        app
     }
 }
 
@@ -87,15 +90,13 @@ impl Default for MainApp {
 }
 
 
-
 // ----------------------------------------------------------------------------
 
-#[derive(PartialEq)]
 pub struct MainApp {
+    pub open_panel: Panel,
     pub library_app: LibraryApp,
     pub log_app: LogApp,
     pub settings_app: SettingsApp,
-    pub open_panel: Panel,
 }
 
 
@@ -113,6 +114,25 @@ impl eframe::App for MainApp {
                 ui.selectable_value(&mut self.open_panel, Panel::Log, RichText::new("RSS").size(14.0));
                 ui.selectable_value(&mut self.open_panel, Panel::Log, RichText::new("日志").size(14.0));
                 ui.selectable_value(&mut self.open_panel, Panel::Settings, RichText::new("设置").size(14.0));
+                ui.with_layout(egui::Layout::right_to_left(Align::RIGHT), |ui| {
+                    ui.add_space(5.0);
+                    ui.horizontal_centered(|ui| {
+                        let mut refresh_rss = ui.button(RichText::new("更新订阅").size(13.0));
+                        if self.library_app.library.try_write().is_err() {
+                            // disable button
+                            refresh_rss.enabled = false;
+                        }
+                        if refresh_rss.clicked() {
+                            self.library_app.update_rss();
+                        }
+                    });
+                    ui.add_space(5.0);
+                    ui.horizontal_centered(|ui| {
+                        if self.library_app.library.try_write().is_err() {
+                            ui.spinner();
+                        }
+                    });
+                });
             });
             ui.add_space(2.0);
 

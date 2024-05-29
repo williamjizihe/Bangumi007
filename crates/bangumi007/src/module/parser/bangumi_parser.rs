@@ -3,10 +3,12 @@ use std::error::Error;
 use fancy_regex::Regex;
 use retry::delay::Fixed;
 
+use crate::module::database::cache::rss::BangumiEpisode;
 use crate::module::utils::error::{new_err, new_warn};
 
 pub struct BangumiSubject {
     pub bangumi_subject_id: i32,
+    pub image_url: String,
     pub aliases: Vec<String>,
     pub media_type: String,
     pub season_num: i32,
@@ -14,12 +16,18 @@ pub struct BangumiSubject {
 
 pub fn get_bangumi_subject(bangumi_subject_id: i32) -> rusqlite::Result<BangumiSubject, Box<dyn Error>> {
     let json = get_bangumi_subject_json(bangumi_subject_id)?;
+    let image_url = json.get("images")
+        .ok_or_else(|| new_warn("Failed to get image url"))
+        .and_then(|x| x.get("large").ok_or_else(|| new_warn("Failed to get image url")))
+        .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get image url as str")))
+        .map(|x| x.to_string())?;
     let aliases = get_bangumi_subject_aliases(&json)?;
     let media_type = get_bangumi_media_type(&json)?;
     let season_num = parse_season_num_from_aliases(&aliases).unwrap_or(-1);
 
     Ok(BangumiSubject {
         bangumi_subject_id,
+        image_url,
         aliases,
         media_type,
         season_num,
@@ -37,7 +45,7 @@ fn get_bangumi_media_type(json: &serde_json::Value) -> Result<String, Box<dyn Er
     Ok(media_type.to_string())
 }
 
-fn get_bangumi_subject_json (bangumi_subject_id: i32) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+fn get_bangumi_subject_json(bangumi_subject_id: i32) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let url = format!("https://api.bgm.tv/v0/subjects/{}", bangumi_subject_id);
     // add user-agent
     let client = reqwest::blocking::Client::builder()
@@ -84,7 +92,6 @@ fn get_bangumi_subject_json (bangumi_subject_id: i32) -> Result<serde_json::Valu
 ///
 /// Bangumi subject aliases : `Vec of String`
 pub fn get_bangumi_subject_aliases(json: &serde_json::Value) -> Result<Vec<String>, Box<dyn Error>> {
-
     let mut vec_aliases: Vec<String> = Vec::new();
 
     // Parse default name and name_cn
@@ -222,10 +229,160 @@ pub fn parse_season_num_from_aliases(aliases: &Vec<String>) -> Option<i32> {
     None
 }
 
+
+pub fn get_bangumi_episodes(bangumi_subject_id: i32) -> Result<Vec<BangumiEpisode>, Box<dyn Error>> {
+    let cache_result = crate::module::database::cache::rss::get_bangumi_episodes(bangumi_subject_id).unwrap_or_else(|_| Vec::new());
+    if !cache_result.is_empty() {
+        return Ok(cache_result);
+    }
+    
+    let url = format!("https://api.bgm.tv/v0/episodes?subject_id={}&limit={}", bangumi_subject_id, 200);
+    // add user-agent
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("MapleWithered/Bangumi007 (https://github.com/MapleWithered/Bangumi007)")
+        .build()
+        .unwrap();
+
+    let response = retry::retry(Fixed::from_millis(5000), || {
+        match client.get(&url).send() {
+            Ok(response) => {
+                if response.status().is_success() {
+                    Ok(response.text().unwrap())
+                } else {
+                    Err(new_warn(format!("Failed to get bangumi episodes, status code is not 200: {}",
+                                         response.status()).as_str()))
+                }
+            }
+            Err(_) => Err(new_warn("Failed to get bangumi episodes"))
+        }
+    }).map_err(|_| new_err("Failed to get bangumi episodes"))?;
+
+    // Parse json result
+    let json: serde_json::Value = serde_json::from_str(&response)
+        .map_err(|_| new_err("Failed to parse json"))?;
+
+    let mut vec_episodes: Vec<BangumiEpisode> = Vec::new();
+    let json = json.as_object().ok_or_else(|| new_warn("Failed to get json as object"))?;
+    let json = json.get("data").ok_or_else(|| new_warn("Failed to get bangumi episodes"))?;
+    let episodes = json.as_array().ok_or_else(|| new_warn("Failed to get bangumi episodes"))?;
+
+    for episode in episodes {
+        let episode = episode
+            .as_object()
+            .ok_or_else(|| new_warn("Failed to get episode as object"));
+        let episode = match episode {
+            Ok(episode) => episode,
+            Err(_) => continue,
+        };
+
+        let episode_id = episode
+            .get("id")
+            .ok_or_else(|| new_warn("Failed to get episode id"))
+            .and_then(|x| x.as_i64().ok_or_else(|| new_warn("Failed to get episode id as i64")))
+            .and_then(|x| x.try_into().map_err(|_| new_warn("Failed to convert episode id to i32")));
+        let episode_id = match episode_id {
+            Ok(episode_id) => episode_id,
+            Err(_) => continue,
+        };
+
+        let episode_type = episode
+            .get("type")
+            .ok_or_else(|| new_warn("Failed to get episode type"))
+            .and_then(|x| x.as_i64().ok_or_else(|| new_warn("Failed to get episode type as i64")))
+            .and_then(|x| x.try_into().map_err(|_| new_warn("Failed to convert episode type to i32")));
+        let episode_type = match episode_type {
+            Ok(episode_type) => episode_type,
+            Err(_) => continue,
+        };
+
+        let episode_ep = episode
+            .get("ep")
+            .ok_or_else(|| new_warn("Failed to get episode ep"))
+            .and_then(|x| x.as_i64().ok_or_else(|| new_warn("Failed to get episode ep as i64")))
+            .and_then(|x| x.try_into().map_err(|_| new_warn("Failed to convert episode ep to i32")));
+        let episode_ep = match episode_ep {
+            Ok(episode_ep) => episode_ep,
+            Err(_) => continue,
+        };
+
+        let episode_sort = episode
+            .get("sort")
+            .ok_or_else(|| new_warn("Failed to get episode sort"))
+            .and_then(|x| x.as_i64().ok_or_else(|| new_warn("Failed to get episode sort as i64")))
+            .and_then(|x| x.try_into().map_err(|_| new_warn("Failed to convert episode sort to i32")));
+        let episode_sort = match episode_sort {
+            Ok(episode_sort) => episode_sort,
+            Err(_) => continue,
+        };
+
+        let episode_name = episode
+            .get("name")
+            .ok_or_else(|| new_warn("Failed to get episode name"))
+            .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get episode name as str")))
+            .map(|x| x.to_string());
+        let episode_name = match episode_name {
+            Ok(episode_name) => episode_name,
+            Err(_) => continue,
+        };
+
+        let episode_name_cn = episode
+            .get("name_cn")
+            .ok_or_else(|| new_warn("Failed to get episode name_cn"))
+            .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get episode name_cn as str")))
+            .map(|x| x.to_string());
+        let episode_name_cn = match episode_name_cn {
+            Ok(episode_name_cn) => episode_name_cn,
+            Err(_) => continue,
+        };
+
+        let episode_airdate = episode
+            .get("airdate")
+            .ok_or_else(|| new_warn("Failed to get episode airdate"))
+            .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get episode airdate as str")))
+            .map(|x| x.to_string());
+        let episode_airdate = match episode_airdate {
+            Ok(episode_airdate) => episode_airdate,
+            Err(_) => continue,
+        };
+
+        let bangumi_episode = BangumiEpisode {
+            subject_id: bangumi_subject_id,
+            episode_id,
+            episode_type,
+            episode_ep,    // raw index of episode
+            episode_sort,  // display index of episode
+            episode_name,
+            episode_name_cn,
+            episode_airdate,
+        };
+        vec_episodes.push(bangumi_episode);
+    }
+    
+    // Insert into cache
+    for episode in &vec_episodes {
+        crate::module::database::cache::rss::insert_bangumi_episode_to_cache(episode).unwrap();
+    }
+
+    Ok(vec_episodes)
+}
+
+pub fn parse_bangumi_episode(bangumi_subject_id: i32, mikan_episode_num: i32, episode_type: i32) -> Result<BangumiEpisode, Box<dyn Error>> {
+    let episodes = get_bangumi_episodes(bangumi_subject_id)?;
+    let episode = episodes.iter().find(|x| x.episode_sort == mikan_episode_num && x.episode_type == episode_type);
+    if episode.is_some() {
+        return Ok(episode.unwrap().clone());
+    }
+    let episode = episodes.iter().find(|x| x.episode_ep == mikan_episode_num && x.episode_type == episode_type);
+    if episode.is_some() {
+        return Ok(episode.unwrap().clone());
+    }
+    Err(new_err("Failed to find episode"))
+}
+
 #[cfg(test)]
 mod tests {
     use crate::module::logger::logger;
-    use super::*;
+    use crate::module::parser::bangumi_parser::{get_bangumi_episodes, parse_bangumi_episode};
 
     #[test]
     fn test_get_bangumi_subject_aliases() {
@@ -246,5 +403,19 @@ mod tests {
         //     let season = parse_season_num_from_aliases(&aliases).unwrap_or(-1);
         //     println!("Season: {}", season);
         // }
+    }
+
+    #[test]
+    fn test_get_bangumi_episodes() {
+        logger::init();
+        let res = get_bangumi_episodes(425978);
+        println!("{:?}", res);
+    }
+    
+    #[test]
+    fn test_parse_bangumi_episode() {
+        logger::init();
+        let res = parse_bangumi_episode(425978, 8, 0);
+        println!("{:?}", res);
     }
 }

@@ -9,9 +9,11 @@ pub struct AnimeSeason {
     pub mikan_subject_id: i32,
     pub mikan_subgroup_id: i32,
     pub mikan_subject_name: String,
+    pub mikan_subject_image: String,
     pub bangumi_subject_id: i32,
     pub bangumi_subject_name: String,
     pub bangumi_season_num: i32,
+    pub bangumi_subject_image: String,
     pub tmdb_series_id: i32,
     pub tmdb_series_name: String,
     pub tmdb_season_num: i32,
@@ -33,9 +35,11 @@ pub fn init_cache_library_anime_season_table(conn: &Connection) -> Result<(), Bo
             mikan_subject_id integer primary key,
             mikan_subgroup_id integer,
             mikan_subject_name text,
+            mikan_subject_image text,
             bangumi_subject_id integer,
             bangumi_subject_name text,
             bangumi_season_num integer,
+            bangumi_subject_image text,
             tmdb_series_id integer,
             tmdb_series_name text,
             tmdb_season_num integer,
@@ -63,21 +67,23 @@ pub fn read_season_info(mikan_subject_id: i32, mikan_subgroup_id: i32) -> Option
             mikan_subject_id: row.get(0)?,
             mikan_subgroup_id: row.get(1)?,
             mikan_subject_name: row.get(2)?,
-            bangumi_subject_id: row.get(3)?,
-            bangumi_subject_name: row.get(4)?,
-            bangumi_season_num: row.get(5)?,
-            tmdb_series_id: row.get(6)?,
-            tmdb_series_name: row.get(7)?,
-            tmdb_season_num: row.get(8)?,
-            tmdb_season_name: row.get(9)?,
-            bangumi_to_tmdb_episode_offset: row.get(10)?,
-            disp_series_name: row.get(11)?,
-            disp_season_name: row.get(12)?,
-            disp_subgroup_name: row.get(13)?,
-            disp_season_num: row.get(14)?,
-            conf_episode_offset: row.get(15)?,
-            conf_language: row.get(16)?,
-            conf_codec: row.get(17)?,
+            mikan_subject_image: row.get(3)?,
+            bangumi_subject_id: row.get(4)?,
+            bangumi_subject_name: row.get(5)?,
+            bangumi_season_num: row.get(6)?,
+            bangumi_subject_image: row.get(7)?,
+            tmdb_series_id: row.get(8)?,
+            tmdb_series_name: row.get(9)?,
+            tmdb_season_num: row.get(10)?,
+            tmdb_season_name: row.get(11)?,
+            bangumi_to_tmdb_episode_offset: row.get(12)?,
+            disp_series_name: row.get(13)?,
+            disp_season_name: row.get(14)?,
+            disp_subgroup_name: row.get(15)?,
+            disp_season_num: row.get(16)?,
+            conf_episode_offset: row.get(17)?,
+            conf_language: row.get(18)?,
+            conf_codec: row.get(19)?,
         })
     }).unwrap();
 
@@ -95,9 +101,11 @@ pub fn create_season(season: &AnimeSeason) {
             mikan_subject_id,
             mikan_subgroup_id,
             mikan_subject_name,
+            mikan_subject_image,
             bangumi_subject_id,
             bangumi_subject_name,
             bangumi_season_num,
+            bangumi_subject_image,
             tmdb_series_id,
             tmdb_series_name,
             tmdb_season_num,
@@ -110,14 +118,16 @@ pub fn create_season(season: &AnimeSeason) {
             conf_episode_offset,
             conf_language,
             conf_codec
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)",
         &[
             &season.mikan_subject_id.to_string(),
             &season.mikan_subgroup_id.to_string(),
             &season.mikan_subject_name,
+            &season.mikan_subject_image,
             &season.bangumi_subject_id.to_string(),
             &season.bangumi_subject_name,
             &season.bangumi_season_num.to_string(),
+            &season.bangumi_subject_image,
             &season.tmdb_series_id.to_string(),
             &season.tmdb_series_name,
             &season.tmdb_season_num.to_string(),
@@ -151,21 +161,23 @@ pub fn read_seasons() -> Vec<AnimeSeason> {
             mikan_subject_id: row.get(0)?,
             mikan_subgroup_id: row.get(1)?,
             mikan_subject_name: row.get(2)?,
-            bangumi_subject_id: row.get(3)?,
-            bangumi_subject_name: row.get(4)?,
-            bangumi_season_num: row.get(5)?,
-            tmdb_series_id: row.get(6)?,
-            tmdb_series_name: row.get(7)?,
-            tmdb_season_num: row.get(8)?,
-            tmdb_season_name: row.get(9)?,
-            bangumi_to_tmdb_episode_offset: row.get(10)?,
-            disp_series_name: row.get(11)?,
-            disp_season_name: row.get(12)?,
-            disp_subgroup_name: row.get(13)?,
-            disp_season_num: row.get(14)?,
-            conf_episode_offset: row.get(15)?,
-            conf_language: row.get(16)?,
-            conf_codec: row.get(17)?,
+            mikan_subject_image: row.get(3)?,
+            bangumi_subject_id: row.get(4)?,
+            bangumi_subject_name: row.get(5)?,
+            bangumi_season_num: row.get(6)?,
+            bangumi_subject_image: row.get(7)?,
+            tmdb_series_id: row.get(8)?,
+            tmdb_series_name: row.get(9)?,
+            tmdb_season_num: row.get(10)?,
+            tmdb_season_name: row.get(11)?,
+            bangumi_to_tmdb_episode_offset: row.get(12)?,
+            disp_series_name: row.get(13)?,
+            disp_season_name: row.get(14)?,
+            disp_subgroup_name: row.get(15)?,
+            disp_season_num: row.get(16)?,
+            conf_episode_offset: row.get(17)?,
+            conf_language: row.get(18)?,
+            conf_codec: row.get(19)?,
         })
     }).unwrap();
 
@@ -195,6 +207,9 @@ pub struct AnimeSeasonItem {
     pub mikan_parsed_language: String,
     pub mikan_parsed_codec: String,
     pub disp_episode_num: i32,
+    pub bangumi_parsed_episode_id: i32,
+    pub bangumi_parsed_episode_ep: i32,
+    pub bangumi_parsed_episode_sort: i32,
 }
 
 #[deny(dead_code)]
@@ -215,7 +230,10 @@ pub fn init_cache_library_anime_season_item_table(conn: &Connection) -> Result<(
             mikan_parsed_episode_num integer,
             mikan_parsed_language text,
             mikan_parsed_codec text,
-            disp_episode_num integer
+            disp_episode_num integer,
+            bangumi_parsed_episode_id integer,
+            bangumi_parsed_episode_ep integer,
+            bangumi_parsed_episode_sort integer
         )",
         [],
     )?;
@@ -243,8 +261,11 @@ pub fn create_item(item: &crate::module::database::cache::rss::MikanItem) {
             mikan_parsed_episode_num,
             mikan_parsed_language,
             mikan_parsed_codec,
-            disp_episode_num
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)",
+            disp_episode_num,
+            bangumi_parsed_episode_id,
+            bangumi_parsed_episode_ep,
+            bangumi_parsed_episode_sort
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
         &[
             &item.mikan_item_uuid,
             &item.mikan_subject_id.to_string(),
@@ -261,6 +282,9 @@ pub fn create_item(item: &crate::module::database::cache::rss::MikanItem) {
             &item.mikan_parsed_language,
             &item.mikan_parsed_codec,
             &episode_num_offseted.to_string(),
+            &item.bangumi_parsed_episode_id.to_string(),
+            &item.bangumi_parsed_episode_ep.to_string(),
+            &item.bangumi_parsed_episode_sort.to_string(),
         ],
     ).unwrap();
 }
@@ -295,6 +319,9 @@ pub fn read_season_items(mikan_subject_id: i32, mikan_subgroup_id: i32) -> Vec<A
             mikan_parsed_language: row.get(12)?,
             mikan_parsed_codec: row.get(13)?,
             disp_episode_num: row.get(14)?,
+            bangumi_parsed_episode_id: row.get(15)?,
+            bangumi_parsed_episode_ep: row.get(16)?,
+            bangumi_parsed_episode_sort: row.get(17)?,
         })
     }).unwrap();
 
@@ -305,7 +332,6 @@ pub fn read_season_items(mikan_subject_id: i32, mikan_subgroup_id: i32) -> Vec<A
 
     items
 }
-
 
 
 pub fn read_all_items() -> Vec<AnimeSeasonItem> {
@@ -328,6 +354,9 @@ pub fn read_all_items() -> Vec<AnimeSeasonItem> {
             mikan_parsed_language: row.get(12)?,
             mikan_parsed_codec: row.get(13)?,
             disp_episode_num: row.get(14)?,
+            bangumi_parsed_episode_id: row.get(15)?,
+            bangumi_parsed_episode_ep: row.get(16)?,
+            bangumi_parsed_episode_sort: row.get(17)?,
         })
     }).unwrap();
 

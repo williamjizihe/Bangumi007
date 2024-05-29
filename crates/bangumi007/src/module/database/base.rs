@@ -3,7 +3,7 @@ use std::sync::RwLock;
 use lazy_static::lazy_static;
 use rusqlite::Connection;
 
-use crate::module::database::cache::rss::{init_cache_mikan_item_table, init_cache_mikan_subject_table};
+use crate::module::database::cache::rss::{init_cache_bangumi_episode_table, init_cache_mikan_item_table, init_cache_mikan_subject_table};
 use crate::module::database::library::{init_cache_library_anime_season_item_table, init_cache_library_anime_season_table};
 
 const DATABASE_PATH: &str = "data/database/database.db";
@@ -36,6 +36,7 @@ pub fn init_database() -> Result<(), Box<dyn std::error::Error>> {
     init_cache_mikan_subject_table(&conn)?;
     init_cache_library_anime_season_table(&conn)?;
     init_cache_library_anime_season_item_table(&conn)?;
+    init_cache_bangumi_episode_table(&conn)?;
     INITED_DB.write().unwrap().set_inited();
     Ok(())
 }

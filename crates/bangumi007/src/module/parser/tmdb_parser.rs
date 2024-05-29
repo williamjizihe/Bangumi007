@@ -1,13 +1,12 @@
 use std::collections::HashMap;
 use std::error::Error;
-use log::trace;
 
+use log::trace;
 use retry::delay::Fixed;
 
 use crate::module::config::CONFIG;
 use crate::module::parser::bangumi_parser::{get_bangumi_subject, get_bangumi_subject_aliases};
 use crate::module::utils::error::{new_err, new_warn};
-
 
 pub fn tmdb_search_tv(series_name: &str) -> rusqlite::Result<i64, Box<dyn Error>> {
 
@@ -355,6 +354,7 @@ pub fn bangumi_parse_tmdb_info(bangumi_subject_id: i32) -> Result<TMDBParseResul
 #[cfg(test)]
 mod tests {
     use log::debug;
+
     use crate::module::logger;
     use crate::module::parser::bangumi_parser::get_bangumi_subject_aliases;
 
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn test_tmdb() {
         logger::init();
-        let bangumi_ids = vec![283643, ];     //285666, 303864, 444557, 208908, 455345, 425978, 455835, 416777, 350235, 364522, 342667
+        let bangumi_ids = vec![283643];     //285666, 303864, 444557, 208908, 455345, 425978, 455835, 416777, 350235, 364522, 342667
         for bangumi_id in bangumi_ids {
             let bangumi_subject = get_bangumi_subject(bangumi_id).unwrap();
             let aliases = bangumi_subject.aliases;

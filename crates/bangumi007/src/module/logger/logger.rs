@@ -23,6 +23,8 @@ pub fn get_logging_config() -> Config {
         .encoder(Box::new(PatternEncoder::new("{d(%Y-%m-%d %H:%M:%S%.6f)} {h({l}):<5.5} [{M}] {m}{n}")))
         .build("log/bangumi007.log")
         .unwrap();
+    
+    // TODO: mpsc appender
 
     fn get_log_level() -> log::LevelFilter {
         match CONFIG.read().unwrap().log_config.log_level.as_str() {
@@ -42,6 +44,7 @@ pub fn get_logging_config() -> Config {
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .appender(Appender::builder().build("file", Box::new(file)))
+        // TODO: mpsc appender
         .logger(Logger::builder().appender("file").build("bangumi007", get_log_level()))
         .build(
             log4rs::config::Root::builder()
@@ -53,8 +56,8 @@ pub fn get_logging_config() -> Config {
     config
 }
 
-fn init_logging() -> Handle {
-    let handle = log4rs::init_config(get_logging_config()).unwrap();
+fn init_logging() -> Handle {   // TODO: add mpsc here
+    let handle = log4rs::init_config(get_logging_config()).unwrap();        // Pass the mpsc to get_logging_config
     log::debug!("Log level: {:?}", CONFIG.read().unwrap().log_config.log_level);
     handle
 }

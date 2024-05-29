@@ -15,7 +15,7 @@ use cache::rss::{fetch_cached_items, filter_uncached_items, insert_item_to_cache
 use crate::module::database::cache;
 use crate::module::database::cache::rss::{fetch_mikan_subject_info, insert_subject_to_cache, MikanItem, MikanSubject};
 use crate::module::parser::bangumi_parser;
-use crate::module::parser::bangumi_parser::parse_season_num_from_aliases;
+use crate::module::parser::bangumi_parser::{parse_bangumi_episode, parse_season_num_from_aliases};
 use crate::module::parser::tmdb_parser::bangumi_parse_tmdb_info;
 use crate::module::utils::error::{new_err, new_warn};
 
@@ -184,8 +184,8 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
         let uuid = &link[uuid + 1..];
         result.push(MikanItem {
             mikan_item_uuid: uuid.to_string(),          // Item UUID
-            mikan_subject_id: 0,
-            mikan_subgroup_id: 0,
+            mikan_subject_id: -1,
+            mikan_subgroup_id: -1,
             mikan_subject_name: "".to_string(),
             mikan_item_title: title.to_string(),        // Item Title
             mikan_item_magnet_link: "".to_string(),
@@ -197,6 +197,9 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
             mikan_parsed_episode_num: parse_filename_to_episode(&title).unwrap_or(-1),  // Episode Number
             mikan_parsed_language: parse_filename_to_language(&title),           // Language
             mikan_parsed_codec: parse_filename_to_codec(&title),                 // Codec
+            bangumi_parsed_episode_id: -1,
+            bangumi_parsed_episode_ep: -1,
+            bangumi_parsed_episode_sort: -1,
         });
     }
 
@@ -360,6 +363,17 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
     let subgid = subgid.parse::<i32>().unwrap();
     log::debug!("Subgroup ID: {}", subgid);
 
+    // Parse the subject image
+    let mikan_subject_image_url = response.find("bangumi-poster")
+        .map_or(Ok("".to_string()), |x| -> Result<String, Box<dyn Error>>{
+            let start = response[x..].find("url(\'").ok_or_else(|| new_err("Failed to parse image"))?;
+            let start = x + start + 5;
+            let end = response[start..].find("\'").ok_or_else(|| new_err("Failed to parse image"))?;
+            let url = format!("https://mikanani.me{}", response[start..start + end].to_string()).to_string();
+            Ok(url)
+        })
+        .unwrap_or("".to_string());
+
     let mikan_subject_info = match fetch_mikan_subject_info(mikan_subject_id) {
         Some(info) => Some(info),       // Use cached info
         None => {
@@ -374,10 +388,11 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
 
             // 2. Parse the season number using all the names fetched by Bangumi API
             let bangumi_subject_info = bangumi_parser::get_bangumi_subject(bangumi_subject_id)?;
-            
+
             let bangumi_aliases = bangumi_subject_info.aliases;
             let bangumi_season_num = bangumi_subject_info.season_num;
             let bangumi_subject_name = bangumi_aliases.iter().next().unwrap().clone();
+            let bangumi_subject_image_url = bangumi_subject_info.image_url;
 
             // 3-4: Parse using TMDB API
             let tmdb_info = bangumi_parse_tmdb_info(bangumi_subject_id)
@@ -386,9 +401,11 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
                 Ok(tmdb_info) => {
                     let subject = MikanSubject {
                         mikan_subject_id,
+                        mikan_subject_image_url,
                         bangumi_subject_id,
                         bangumi_subject_name,
                         bangumi_season_num,
+                        bangumi_subject_image_url,
                         tmdb_series_id: tmdb_info.media_id as i32,
                         tmdb_series_name: tmdb_info.media_name,
                         tmdb_season_num: tmdb_info.season_number as i32,
@@ -401,9 +418,11 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
                 }
                 Err(_) => Some(MikanSubject {
                     mikan_subject_id,
+                    mikan_subject_image_url,
                     bangumi_subject_id,
                     bangumi_subject_name,
                     bangumi_season_num,
+                    bangumi_subject_image_url,
                     tmdb_series_id: -1,
                     tmdb_series_name: "".to_string(),
                     tmdb_season_num: -1,
@@ -446,6 +465,24 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
         None => 0
     };
 
+    let bangumi_episode_info = match &mikan_subject_info {
+        Some(info) => {
+            let episode_info = parse_bangumi_episode(info.bangumi_subject_id,
+                                                     item.mikan_parsed_episode_num + episode_offset,
+                                                     0);
+            match episode_info {
+                Ok(info) => Some(info),
+                Err(_) => None
+            }
+        }
+        None => None
+    };
+
+    let (bangumi_parsed_episode_id, bangumi_parsed_episode_ep, bangumi_parsed_episode_sort) = match &bangumi_episode_info {
+        Some(info) => (info.episode_id, info.episode_ep, info.episode_sort),
+        None => (-1, -1, -1)
+    };
+
     Ok(MikanItem {
         mikan_item_uuid: item.mikan_item_uuid.to_string(),
         mikan_subject_id,
@@ -461,6 +498,9 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
         mikan_parsed_episode_num: item.mikan_parsed_episode_num + episode_offset,
         mikan_parsed_language: item.mikan_parsed_language.to_string(),
         mikan_parsed_codec: item.mikan_parsed_codec.to_string(),
+        bangumi_parsed_episode_id,
+        bangumi_parsed_episode_ep,
+        bangumi_parsed_episode_sort,
     })
 }
 
