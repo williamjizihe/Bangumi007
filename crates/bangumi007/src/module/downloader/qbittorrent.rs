@@ -8,6 +8,7 @@ use serde::Deserialize;
 
 use crate::module::config::{CONFIG, DownloaderConfig};
 use crate::module::database::library::{AnimeSeason, AnimeSeasonItem, read_season_info};
+use crate::module::utils::error::new_err;
 
 #[derive(Debug)]
 struct Downloader {
@@ -358,6 +359,7 @@ pub fn download_items(items: &Vec<AnimeSeasonItem>, move_existing: bool) -> Resu
                 .and_then(|_| move_torrent_item(item))
                 .and_then(|_| set_torrent_category(item))
                 .and_then(|_| add_torrent_tags(item))
+                .map_err(|e| new_err(format!("Failed to move torrent: {}", e).as_str()))
                 .unwrap_or(());  // ignore error, continue to next torrent
         }
     }

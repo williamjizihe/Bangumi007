@@ -9,15 +9,19 @@ use crate::ui::panels::libraryapp::{AppAnimeSeason, AppAnimeSeries, LibraryApp};
 impl LibraryApp {
     pub fn update_rss(&mut self) {
 
+        log::info!("Update rss pressed");
+
         let library = self.library.clone();
 
         let handle = thread::spawn(move || {
 
-            let library = library.try_write();
+            let library = library.write();
 
-            if let Err(_) = library {
+            if let Err(e) = library {
+                log::error!("Library lock poisoned: {:?}", e);
                 return;
             }
+            log::debug!("Library locked successfully.");
 
             let mut library = library.unwrap();
 
@@ -84,7 +88,8 @@ impl LibraryApp {
             download_items(&library_items, true).unwrap();
             rename_torrents_files(&library_items).unwrap();
 
-            drop(library);
+            log::info!("RSS updated successfully.");
+            // drop(library);
         });
     }
 
@@ -94,11 +99,13 @@ impl LibraryApp {
 
         let handle = thread::spawn(move || {
 
-            let library = library.try_write();
+            let library = library.write();
 
-            if let Err(_) = library {
+            if let Err(e) = library {
+                log::debug!("Library lock poisoned: {:?}", e);
                 return;
             }
+            log::debug!("Library locked successfully.");
 
             let mut library = library.unwrap();
 
@@ -136,6 +143,7 @@ impl LibraryApp {
                 (*library).push(series);
             }
 
+            log::debug!("Library updated successfully.");
             drop(library);
         });
     }

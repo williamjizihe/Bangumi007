@@ -20,7 +20,7 @@ use crate::ui::panels::settingsapp::SettingsApp;
 pub fn ui_main() -> Result<(), eframe::Error> {
     run_init().unwrap();
     let ui_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([640.0, 480.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([700.0, 500.0]),
         ..Default::default()
     };
     eframe::run_native(
@@ -117,18 +117,19 @@ impl eframe::App for MainApp {
                 ui.with_layout(egui::Layout::right_to_left(Align::RIGHT), |ui| {
                     ui.add_space(5.0);
                     ui.horizontal_centered(|ui| {
-                        let mut refresh_rss = ui.button(RichText::new("更新订阅").size(13.0));
-                        if self.library_app.library.try_write().is_err() {
-                            // disable button
-                            refresh_rss.enabled = false;
+                        if self.library_app.library.try_read().is_ok() {
+                            let mut refresh_rss = ui.button(RichText::new("更新订阅").size(13.0));
+                            if refresh_rss.clicked() {
+                                self.library_app.update_rss();
+                            }
                         }
-                        if refresh_rss.clicked() {
-                            self.library_app.update_rss();
+                        else {
+                            ui.label(RichText::new("正在更新订阅").size(13.0));
                         }
                     });
                     ui.add_space(5.0);
                     ui.horizontal_centered(|ui| {
-                        if self.library_app.library.try_write().is_err() {
+                        if self.library_app.library.try_read().is_err() {
                             ui.spinner();
                         }
                     });

@@ -55,218 +55,44 @@ fn series_layout(ui: &mut egui::Ui, series: &AppAnimeSeries) {
 
 impl LibraryApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        if self.library.try_read().and_then(|l| Ok(l.is_empty())).unwrap_or(false) {
-            // self.library.push(
-            //     AppAnimeSeries {
-            //         disp_series_name: "NEW GAME".to_string(),
-            //         seasons: vec![
-            //             AppAnimeSeason {
-            //                 mikan_subject_id: 295017,
-            //                 mikan_subgroup_id: 90,
-            //                 disp_season_name: "NEW GAME!".to_string(),
-            //                 disp_season_num: 1,
-            //                 disp_thumbnail_url: "https://lain.bgm.tv/pic/cover/c/0f/79/150775_rRSAT.jpg".to_string(),
-            //                 episodes: vec![
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "1".to_string(),
-            //                         disp_episode_num: 1,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "2".to_string(),
-            //                         disp_episode_num: 2,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "3".to_string(),
-            //                         disp_episode_num: 3,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "4".to_string(),
-            //                         disp_episode_num: 4,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "5".to_string(),
-            //                         disp_episode_num: 5,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "6".to_string(),
-            //                         disp_episode_num: 6,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "7".to_string(),
-            //                         disp_episode_num: 7,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "8".to_string(),
-            //                         disp_episode_num: 8,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "9".to_string(),
-            //                         disp_episode_num: 9,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "10".to_string(),
-            //                         disp_episode_num: 10,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "11".to_string(),
-            //                         disp_episode_num: 11,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "12".to_string(),
-            //                         disp_episode_num: 12,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "1".to_string(),
-            //                         disp_episode_num: 1,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "2".to_string(),
-            //                         disp_episode_num: 2,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "3".to_string(),
-            //                         disp_episode_num: 3,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "4".to_string(),
-            //                         disp_episode_num: 4,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "5".to_string(),
-            //                         disp_episode_num: 5,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "6".to_string(),
-            //                         disp_episode_num: 600,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "7".to_string(),
-            //                         disp_episode_num: 7,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "8".to_string(),
-            //                         disp_episode_num: 8,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "9".to_string(),
-            //                         disp_episode_num: 9,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "10".to_string(),
-            //                         disp_episode_num: 10,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "11".to_string(),
-            //                         disp_episode_num: 110,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "12".to_string(),
-            //                         disp_episode_num: 120,
-            //                     },
-            //                 ],
-            //             },
-            //             AppAnimeSeason {
-            //                 mikan_subject_id: 295017,
-            //                 mikan_subgroup_id: 90,
-            //                 disp_season_name: "NEW GAME!!".to_string(),
-            //                 disp_season_num: 2,
-            //                 disp_thumbnail_url: "https://lain.bgm.tv/pic/cover/c/32/44/208908_AATp0.jpg".to_string(),
-            //                 episodes: vec![
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "1".to_string(),
-            //                         disp_episode_num: 1,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "2".to_string(),
-            //                         disp_episode_num: 2,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "3".to_string(),
-            //                         disp_episode_num: 3,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "4".to_string(),
-            //                         disp_episode_num: 4,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "5".to_string(),
-            //                         disp_episode_num: 5,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "6".to_string(),
-            //                         disp_episode_num: 6,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "7".to_string(),
-            //                         disp_episode_num: 7,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "8".to_string(),
-            //                         disp_episode_num: 8,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "9".to_string(),
-            //                         disp_episode_num: 9,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "10".to_string(),
-            //                         disp_episode_num: 10,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "11".to_string(),
-            //                         disp_episode_num: 11,
-            //                     },
-            //                     AppAnimeEpisode {
-            //                         episode_hash: "12".to_string(),
-            //                         disp_episode_num: 12,
-            //                     },
-            //                 ],
-            //             },
-            //         ],
-            //     }
-            // );
-            ui.centered_and_justified(|ui| {
-                ui.label("媒体库无内容");
-            });
-            return;
-        }
-        if self.library.try_write().is_err() {
+        let library = self.library.clone();
+        let library = library.try_read();
+        if library.is_err() {
             ui.centered_and_justified(|ui| {
                 ui.label("正在更新订阅源...");
             });
             return;
         }
+        let library = library.unwrap();
+        if library.is_empty() {
+            ui.centered_and_justified(|ui| {
+                ui.label("媒体库无内容");
+            });
+            return;
+        }
+
         egui::ScrollArea::vertical()
             .max_height(f32::INFINITY)
             .auto_shrink(false)
             .show(ui, |ui| {
-                ui.columns(2, |cols| {
-                    let library = self.library.try_read().unwrap();
-                    // let mut count = 0;
-                    // for series in &*library {
-                    //     series_layout(&mut cols[count], series);
-                    //     count = (count + 1) % 2;
-                    // }
-                    cols[0].horizontal_centered(|ui| {
-                        ui.add_space(3.);
-                        // For the first half of the library
-                        ui.vertical(|ui| {
-                            for series in &library[..(library.len() as f32 / 2.).ceil() as usize] {
-                                series_layout(ui, series);
-                            }
+                let max_width = ui.available_width();
+                let columns = (max_width / 280.).floor() as usize;
+                let columns = if columns == 0 { 1 } else { columns };
+                ui.columns(columns, |cols| {
+                    for col_index in 0..columns {
+                        cols[col_index].horizontal_centered(|ui| {
+                            if col_index == 0 { ui.add_space(1.); }
+                            ui.add_space(2.);
+                            // For the first half of the library
+                            ui.vertical(|ui| {
+                                for series in &library[(col_index as f32 * library.len() as f32 / columns as f32).ceil() as usize..((col_index+1) as f32 * library.len() as f32 / columns as f32).ceil() as usize] {
+                                    series_layout(ui, series);
+                                }
+                            });
+                            ui.add_space(2.);
+                            if col_index == columns - 1 { ui.add_space(1.); }
                         });
-                        ui.add_space(2.);
-                    });
-                    cols[1].horizontal_centered(|ui| {
-                        ui.add_space(2.);
-                        // For the first half of the library
-                        ui.vertical(|ui| {
-                            for series in &library[(library.len() as f32 / 2.).ceil() as usize..] {
-                                series_layout(ui, series);
-                            }
-                        });
-                        ui.add_space(3.);
-                    });
+                    }
                 });
             })
         ;
