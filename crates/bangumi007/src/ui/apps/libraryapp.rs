@@ -41,11 +41,19 @@ impl LibraryApp {
                     //     season_conf_dialog_window.open = true;
                     // }
                     ui.vertical(|ui| {
-                        let mut disp_season_name = format!("第 {} 季", season.disp_season_num);
-                        if disp_season_name != season.disp_season_name {
-                            disp_season_name = format!("第 {} 季 - {}", season.disp_season_num,
-                                                       season.disp_season_name);
-                        }
+                        let mut disp_season_name = if season.conf_season_num != -1 {
+                            format!("* 第 {} 季", season.conf_season_num)
+                        } else {
+                            let mut disp_season_name = format!("第 {} 季", season.disp_season_num);
+                            if disp_season_name != season.disp_season_name {
+                                disp_season_name = format!("第 {} 季 - {}", season.disp_season_num,
+                                                           season.disp_season_name);
+                            }
+                            if season.conf_episode_offset != 0 {
+                                disp_season_name = format!("* {}", disp_season_name);
+                            }
+                            disp_season_name
+                        };
                         let season_title = ui.heading(RichText::new(disp_season_name).size(14.0)).on_hover_cursor(PointingHand);
                         if season_title.clicked() {
                             let mut season_conf_dialog_window = season_conf_dialog_window.borrow_mut();
