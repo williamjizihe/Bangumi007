@@ -488,6 +488,34 @@ pub fn rename_torrents_files(items: &Vec<AnimeSeasonItem>) -> Result<(), Box<dyn
     Ok(())
 }
 
+pub fn clean_empty_folders(path: String) {
+    let path = match path.is_empty() {
+        true => get_config().download_dir.clone(),
+        false => path,
+    };
+    // If path not exists, return
+    if !std::path::Path::new(&path).exists() {
+        return;
+    }
+    // If path is not folder, return
+    if !std::path::Path::new(&path).is_dir() {
+        return;
+    }
+    // If path is empty, remove it
+    if std::fs::read_dir(&path).unwrap().count() == 0 {
+        std::fs::remove_dir(&path).unwrap();
+        return;
+    }
+    // Else, walk into and clean subfolders
+    for entry in std::fs::read_dir(&path).unwrap() {
+        let entry = entry.unwrap();
+        let path = entry.path();
+        if path.is_dir() {
+            clean_empty_folders(path.to_str().unwrap().to_string());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::module::logger;

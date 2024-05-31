@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use crate::module::database::library::{AnimeSeason, read_all_items, read_season_items, read_seasons, set_season_conf_season_num, set_season_disp_season_num, set_season_episode_offset};
-use crate::module::downloader::qbittorrent::{download_items, rename_torrents_files};
+use crate::module::downloader::qbittorrent::{clean_empty_folders, download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
 use crate::ui::apps::libraryapp::{AppAnimeSeason, AppAnimeSeries, LibraryApp};
@@ -88,6 +88,7 @@ pub fn update_conf(conf: SeasonConf, library: Arc<RwLock<Vec<AppAnimeSeries>>>) 
         let library_items = read_season_items(conf.subject_id, conf.subgroup_id);
         download_items(&library_items, true).unwrap();
         rename_torrents_files(&library_items).unwrap();
+        clean_empty_folders("".to_string());
 
         log::info!("RSS updated successfully.");
         // drop(library);

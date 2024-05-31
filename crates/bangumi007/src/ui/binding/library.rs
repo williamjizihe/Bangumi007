@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::thread;
 use crate::module::database::library::{AnimeSeason, read_all_items, read_season_items, read_seasons};
-use crate::module::downloader::qbittorrent::{download_items, rename_torrents_files};
+use crate::module::downloader::qbittorrent::{clean_empty_folders, download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
 use crate::ui::apps::libraryapp::{AppAnimeSeason, AppAnimeSeries, LibraryApp};
@@ -33,7 +33,7 @@ impl LibraryApp {
                 if rss.active {
                     let items = update_rss(&*rss.url).unwrap();
                     // By default, only incremental, not expanding the history
-                    // let items = expand_history_episodes(items);
+                    let items = expand_history_episodes(items);
                     update_library(&items);
                 }
             }
@@ -89,13 +89,14 @@ impl LibraryApp {
             let library_items = read_all_items();
             download_items(&library_items, true).unwrap();
             rename_torrents_files(&library_items).unwrap();
+            clean_empty_folders("".to_string());
 
             log::info!("RSS updated successfully.");
             // drop(library);
         });
     }
 
-    pub fn update_library(&mut self) {
+    pub fn fetch_library(&mut self) {
 
         let library = self.library.clone();
 

@@ -75,7 +75,7 @@ impl MainApp {
         visuals.override_text_color = Some(ecolor::Color32::from_rgba_premultiplied(220, 220, 220, 255));
         &cc.egui_ctx.set_visuals(visuals);
         let mut app = Self::default();
-        app.library_app.update_library();
+        app.library_app.fetch_library();
         app
     }
 }
