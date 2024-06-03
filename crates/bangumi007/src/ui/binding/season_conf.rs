@@ -17,7 +17,8 @@ pub struct SeasonConf {
     pub conf_season_changed: bool,
     pub ep_num_min: i32,
     pub ep_num_max: i32,
-    pub conf_ep_offset: i32,
+    pub conf_tmdb_ep_offset: i32,
+    pub conf_bangumi_ep_offset: i32,
 }
 
 pub fn update_conf(conf: SeasonConf, library: Arc<RwLock<Vec<AppAnimeSeries>>>) {
@@ -48,7 +49,7 @@ pub fn update_conf(conf: SeasonConf, library: Arc<RwLock<Vec<AppAnimeSeries>>>) 
         }
         set_season_disp_season_num(conf.subject_id, conf.subgroup_id, conf.conf_season);
 
-        set_season_tmdb_episode_offset(conf.subject_id, conf.subgroup_id, conf.conf_ep_offset);
+        set_season_tmdb_episode_offset(conf.subject_id, conf.subgroup_id, conf.conf_tmdb_ep_offset);
 
         *library = Vec::new();
         // Output media library

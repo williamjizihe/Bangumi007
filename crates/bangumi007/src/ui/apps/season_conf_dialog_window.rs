@@ -21,6 +21,7 @@ pub struct SeasonConfDialogWindow {
     pub ep_num_min: i32,
     pub ep_num_max: i32,
     pub conf_tmdb_ep_offset: i32,
+    pub conf_bangumi_ep_offset: i32,
 }
 
 impl SeasonConfDialogWindow {
@@ -37,6 +38,7 @@ impl SeasonConfDialogWindow {
             ep_num_min: -1,
             ep_num_max: -1,
             conf_tmdb_ep_offset: 0,
+            conf_bangumi_ep_offset: 0,
         }
     }
 
@@ -59,6 +61,7 @@ impl SeasonConfDialogWindow {
                         };
 
                         self.conf_tmdb_ep_offset = season.conf_tmdb_episode_offset;
+                        self.conf_bangumi_ep_offset = season.conf_bangumi_episode_offset;
                         self.ep_num_min = season.episodes.iter().map(|e| e.disp_episode_num - self.conf_tmdb_ep_offset).min().unwrap();
                         self.ep_num_max = season.episodes.iter().map(|e| e.disp_episode_num - self.conf_tmdb_ep_offset).max().unwrap();
                         break 'outer;
@@ -74,10 +77,10 @@ impl SeasonConfDialogWindow {
             egui::Window::new(RichText::new("编辑季度信息").size(17.))
                 .resizable(false)
                 .title_bar(true)
-                .current_pos([ctx.available_rect().center().x - 120., ctx.available_rect().center().y - 100.])
+                .current_pos([ctx.available_rect().center().x - 120., ctx.available_rect().center().y - 125.])
         }
             .default_width(240.)
-            .default_height(200.)
+            .default_height(250.)
             .open(&mut *self.open.borrow_mut())
             .show(ctx, |ui| {
                 egui::Grid::new("season_conf_dialog")
@@ -109,20 +112,20 @@ impl SeasonConfDialogWindow {
                             );
                         });
                         ui.end_row();
-                        ui.label("原始剧集范围：");
+                        ui.label("字幕组剧集范围：");
                         ui.label(format!("{} - {}", self.ep_num_min, self.ep_num_max));
                         ui.end_row();
-                        ui.label("剧集偏移：");
+                        ui.label("TMDB剧集偏移：").on_hover_text("TMDB剧集偏移量，影响刮削结果文件名与Jellyfin剧集元数据显示");
                         ui.horizontal_centered(|ui| {
                             let drag = ui.add(
                                 egui::DragValue::new(&mut self.conf_tmdb_ep_offset)
                                     .speed(0.3)
                                     .clamp_range(-self.ep_num_min + 1..=999)
-                            );
+                            ).on_hover_text("TMDB剧集偏移量，影响刮削结果文件名与Jellyfin剧集元数据显示");
                             ui.add_enabled_ui(
                                 self.conf_tmdb_ep_offset != 0,
                                 |ui| {
-                                    let button = ui.button("x").on_hover_text("重置剧集偏移");
+                                    let button = ui.button("x").on_hover_text("重置TMDB剧集偏移");
                                     if button.clicked() {
                                         self.conf_tmdb_ep_offset = 0;
                                     }
@@ -130,9 +133,34 @@ impl SeasonConfDialogWindow {
                             );
                         });
                         ui.end_row();
-                        ui.label("新剧集范围：");
+                        ui.label("TMDB剧集范围：");
                         // if self.conf_ep_offset != 0 {
                             ui.label(format!("{} - {}", self.ep_num_min + self.conf_tmdb_ep_offset, self.ep_num_max + self.conf_tmdb_ep_offset));
+                        // } else {
+                        //     ui.label("(未更改)");
+                        // }
+                        ui.end_row();
+                        ui.label("Bgm剧集偏移：").on_hover_text("Bangumi剧集偏移量，影响播放进度同步时的剧集匹配结果");
+                        ui.horizontal_centered(|ui| {
+                            let drag = ui.add(
+                                egui::DragValue::new(&mut self.conf_bangumi_ep_offset)
+                                    .speed(0.3)
+                                    .clamp_range(-self.ep_num_min + 0..=999)
+                            ).on_hover_text("Bangumi剧集偏移量，影响播放进度同步时的剧集匹配结果");
+                            ui.add_enabled_ui(
+                                self.conf_bangumi_ep_offset != 0,
+                                |ui| {
+                                    let button = ui.button("x").on_hover_text("重置Bangumi剧集偏移");
+                                    if button.clicked() {
+                                        self.conf_bangumi_ep_offset = 0;
+                                    }
+                                },
+                            );
+                        });
+                        ui.end_row();
+                        ui.label("Bgm剧集范围：");
+                        // if self.conf_ep_offset != 0 {
+                        ui.label(format!("{} - {}", self.ep_num_min + self.conf_bangumi_ep_offset, self.ep_num_max + self.conf_bangumi_ep_offset));
                         // } else {
                         //     ui.label("(未更改)");
                         // }
@@ -162,7 +190,8 @@ impl SeasonConfDialogWindow {
                                 conf_season_changed: self.conf_season_changed,
                                 ep_num_min: self.ep_num_min,
                                 ep_num_max: self.ep_num_max,
-                                conf_ep_offset: self.conf_tmdb_ep_offset,
+                                conf_tmdb_ep_offset: self.conf_tmdb_ep_offset,
+                                conf_bangumi_ep_offset: self.conf_bangumi_ep_offset,
                             },
                                         library.clone());
                             self.open_my = false;

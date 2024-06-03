@@ -7,3 +7,6 @@
 
 *.log
 *.db
+
+/crates/bangumi007/data
+/crates/bangumi007/log

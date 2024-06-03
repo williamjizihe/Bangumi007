@@ -236,7 +236,7 @@ pub fn get_bangumi_episodes(bangumi_subject_id: i32) -> Result<Vec<BangumiEpisod
         return Ok(cache_result);
     }
     
-    let url = format!("https://api.bgm.tv/v0/episodes?subject_id={}&limit={}", bangumi_subject_id, 200);
+    let url = format!("https://api.bgm.tv/v0/episodes?subject_id={}", bangumi_subject_id);
     // add user-agent
     let client = reqwest::blocking::Client::builder()
         .user_agent("MapleWithered/Bangumi007 (https://github.com/MapleWithered/Bangumi007)")
