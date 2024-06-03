@@ -20,7 +20,7 @@ pub struct SeasonConfDialogWindow {
     pub conf_season_changed: bool,
     pub ep_num_min: i32,
     pub ep_num_max: i32,
-    pub conf_ep_offset: i32,
+    pub conf_tmdb_ep_offset: i32,
 }
 
 impl SeasonConfDialogWindow {
@@ -36,7 +36,7 @@ impl SeasonConfDialogWindow {
             conf_season_changed: false,
             ep_num_min: -1,
             ep_num_max: -1,
-            conf_ep_offset: 0,
+            conf_tmdb_ep_offset: 0,
         }
     }
 
@@ -58,9 +58,9 @@ impl SeasonConfDialogWindow {
                             season.disp_season_num
                         };
 
-                        self.conf_ep_offset = season.conf_episode_offset;
-                        self.ep_num_min = season.episodes.iter().map(|e| e.disp_episode_num - self.conf_ep_offset).min().unwrap();
-                        self.ep_num_max = season.episodes.iter().map(|e| e.disp_episode_num - self.conf_ep_offset).max().unwrap();
+                        self.conf_tmdb_ep_offset = season.conf_tmdb_episode_offset;
+                        self.ep_num_min = season.episodes.iter().map(|e| e.disp_episode_num - self.conf_tmdb_ep_offset).min().unwrap();
+                        self.ep_num_max = season.episodes.iter().map(|e| e.disp_episode_num - self.conf_tmdb_ep_offset).max().unwrap();
                         break 'outer;
                     }
                 }
@@ -115,16 +115,16 @@ impl SeasonConfDialogWindow {
                         ui.label("剧集偏移：");
                         ui.horizontal_centered(|ui| {
                             let drag = ui.add(
-                                egui::DragValue::new(&mut self.conf_ep_offset)
+                                egui::DragValue::new(&mut self.conf_tmdb_ep_offset)
                                     .speed(0.3)
                                     .clamp_range(-self.ep_num_min + 1..=999)
                             );
                             ui.add_enabled_ui(
-                                self.conf_ep_offset != 0,
+                                self.conf_tmdb_ep_offset != 0,
                                 |ui| {
                                     let button = ui.button("x").on_hover_text("重置剧集偏移");
                                     if button.clicked() {
-                                        self.conf_ep_offset = 0;
+                                        self.conf_tmdb_ep_offset = 0;
                                     }
                                 },
                             );
@@ -132,7 +132,7 @@ impl SeasonConfDialogWindow {
                         ui.end_row();
                         ui.label("新剧集范围：");
                         // if self.conf_ep_offset != 0 {
-                            ui.label(format!("{} - {}", self.ep_num_min + self.conf_ep_offset, self.ep_num_max + self.conf_ep_offset));
+                            ui.label(format!("{} - {}", self.ep_num_min + self.conf_tmdb_ep_offset, self.ep_num_max + self.conf_tmdb_ep_offset));
                         // } else {
                         //     ui.label("(未更改)");
                         // }
@@ -162,7 +162,7 @@ impl SeasonConfDialogWindow {
                                 conf_season_changed: self.conf_season_changed,
                                 ep_num_min: self.ep_num_min,
                                 ep_num_max: self.ep_num_max,
-                                conf_ep_offset: self.conf_ep_offset,
+                                conf_ep_offset: self.conf_tmdb_ep_offset,
                             },
                                         library.clone());
                             self.open_my = false;

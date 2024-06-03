@@ -49,7 +49,7 @@ impl LibraryApp {
                                 disp_season_name = format!("第 {} 季 - {}", season.disp_season_num,
                                                            season.disp_season_name);
                             }
-                            if season.conf_episode_offset != 0 {
+                            if season.conf_tmdb_episode_offset != 0 {
                                 disp_season_name = format!("* {}", disp_season_name);
                             }
                             disp_season_name
@@ -146,7 +146,8 @@ pub struct AppAnimeSeason {
     pub disp_thumbnail_url: String,
     pub default_season_num: i32,
     pub conf_season_num: i32,
-    pub conf_episode_offset: i32,
+    pub conf_tmdb_episode_offset: i32,
+    pub conf_bangumi_episode_offset: i32,
     pub episodes: Vec<AppAnimeEpisode>,
 }
 
@@ -171,7 +172,8 @@ impl From<AnimeSeason> for AppAnimeSeason {
                 season.bangumi_season_num
             },
             episodes: vec![],
-            conf_episode_offset: season.conf_episode_offset,
+            conf_tmdb_episode_offset: season.conf_tmdb_episode_offset,
+            conf_bangumi_episode_offset: season.conf_bangumi_episode_offset,
             conf_season_num: season.conf_season_num,
         }
     }
