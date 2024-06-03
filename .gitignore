@@ -2,6 +2,7 @@
 .idea
 
 /log
+/data
 /data/database
 /data/config
 

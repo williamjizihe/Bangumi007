@@ -10,6 +10,7 @@ use eframe::egui::CursorIcon::PointingHand;
 
 use crate::module::database::library::AnimeSeason;
 use crate::ui::apps::season_conf_dialog_window::SeasonConfDialogWindow;
+use crate::module::scrobbler::bangumi::{BangumiEpisodeStatus, BangumiEpisodeType};
 
 #[derive(Debug, Clone, Default)]
 pub struct LibraryApp {
@@ -18,7 +19,6 @@ pub struct LibraryApp {
 
 
 impl LibraryApp {
-
     fn series_layout(&mut self, ui: &mut egui::Ui, series: &AppAnimeSeries, season_conf_dialog_window: Rc<RefCell<SeasonConfDialogWindow>>) {
         ui.add_space(3.);
         ui.vertical(|ui| {
@@ -70,7 +70,7 @@ impl LibraryApp {
                                 // small button with small text (rich text)
                                 let button = ui
                                     .add_sized([18., 18.],
-                                               egui::Button::new(RichText::new(format!("{:02}", episode.disp_episode_num)).monospace().size(9.0)),
+                                               egui::Button::new(RichText::new(format!("{:02}", episode.disp_episode_num)).monospace().size(9.0).color(episode.bangumi_status.get_text_color(episode.bangumi_airdate.clone()))).fill(episode.bangumi_status.get_fill_color(episode.bangumi_airdate.clone())),
                                     );
                             }
                         });
@@ -83,7 +83,6 @@ impl LibraryApp {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui, season_conf_dialog_window: Rc<RefCell<SeasonConfDialogWindow>>) {
-
         let library = self.library.clone();
         let library = library.try_read();
         if library.is_err() {
@@ -114,7 +113,7 @@ impl LibraryApp {
                             ui.add_space(2.);
                             // For the first half of the library
                             ui.vertical(|ui| {
-                                for series in &library[(col_index as f32 * library.len() as f32 / columns as f32).ceil() as usize..((col_index+1) as f32 * library.len() as f32 / columns as f32).ceil() as usize] {
+                                for series in &library[(col_index as f32 * library.len() as f32 / columns as f32).ceil() as usize..((col_index + 1) as f32 * library.len() as f32 / columns as f32).ceil() as usize] {
                                     self.series_layout(ui, series, season_conf_dialog_window.clone());
                                 }
                             });
@@ -135,12 +134,19 @@ impl LibraryApp {
 pub struct AppAnimeEpisode {
     pub episode_hash: String,
     pub disp_episode_num: i32,
+    pub bangumi_sort: String,
+    pub bangumi_airdate: String,
+    pub bangumi_name: String,
+    pub bangumi_name_cn: String,
+    pub bangumi_ep_type: BangumiEpisodeType,
+    pub bangumi_status: BangumiEpisodeStatus,
 }
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct AppAnimeSeason {
     pub mikan_subject_id: i32,
     pub mikan_subgroup_id: i32,
+    pub bangumi_subject_id: i32,
     pub disp_season_name: String,
     pub disp_season_num: i32,
     pub disp_thumbnail_url: String,
@@ -163,6 +169,7 @@ impl From<AnimeSeason> for AppAnimeSeason {
         Self {
             mikan_subject_id: season.mikan_subject_id,
             mikan_subgroup_id: season.mikan_subgroup_id,
+            bangumi_subject_id: season.bangumi_subject_id,
             disp_season_name: season.disp_season_name,
             disp_season_num: season.disp_season_num,
             disp_thumbnail_url: season.mikan_subject_image,
@@ -185,6 +192,12 @@ impl From<crate::module::database::library::AnimeSeasonItem> for AppAnimeEpisode
         Self {
             episode_hash: episode.mikan_item_uuid,
             disp_episode_num: episode.disp_episode_num,
+            bangumi_sort: "".to_string(),
+            bangumi_airdate: "".to_string(),
+            bangumi_name: "".to_string(),
+            bangumi_name_cn: "".to_string(),
+            bangumi_ep_type: BangumiEpisodeType::MainStory,
+            bangumi_status: BangumiEpisodeStatus::NotCollected,
         }
     }
 }

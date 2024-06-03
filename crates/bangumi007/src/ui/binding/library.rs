@@ -1,10 +1,14 @@
 use std::collections::HashMap;
+use std::sync::{Arc, mpsc, RwLock};
 use std::thread;
+use std::time::Duration;
+use rand::Rng;
 use crate::module::database::library::{AnimeSeason, read_all_items, read_season_items, read_seasons};
 use crate::module::downloader::qbittorrent::{clean_empty_folders, download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
-use crate::ui::apps::libraryapp::{AppAnimeSeason, AppAnimeSeries, LibraryApp};
+use crate::module::scrobbler::bangumi::get_bangumi_episode_collection_status;
+use crate::ui::apps::libraryapp::{AppAnimeEpisode, AppAnimeSeason, AppAnimeSeries, LibraryApp};
 
 impl LibraryApp {
     pub fn update_rss(&mut self) {
@@ -15,16 +19,15 @@ impl LibraryApp {
 
         let handle = thread::spawn(move || {
 
-            let library = library.write();
+            let library_handle = library.clone();
 
+            let library = library_handle.write();
             if let Err(e) = library {
                 log::error!("Library lock poisoned: {:?}", e);
                 return;
             }
             log::debug!("Library locked successfully.");
-
             let mut library = library.unwrap();
-
             log::info!("Start updating rss");
 
             // Fetch RSS feeds
@@ -92,7 +95,10 @@ impl LibraryApp {
             clean_empty_folders("".to_string());
 
             log::info!("RSS updated successfully.");
-            // drop(library);
+            drop(library);
+
+            if Self::fetch_bangumi_watch_status(library_handle) { return; }
+
         });
     }
 
@@ -102,7 +108,9 @@ impl LibraryApp {
 
         let handle = thread::spawn(move || {
 
-            let library = library.write();
+            let library_handle = library.clone();
+
+            let library = library_handle.write();
 
             if let Err(e) = library {
                 log::debug!("Library lock poisoned: {:?}", e);
@@ -150,6 +158,97 @@ impl LibraryApp {
 
             log::debug!("Library updated successfully.");
             drop(library);
+
+            if Self::fetch_bangumi_watch_status(library_handle) { return; }
         });
+    }
+
+    pub fn fetch_bangumi_watch_status(library_handle: Arc<RwLock<Vec<AppAnimeSeries>>>) -> bool {
+        // self.fetch_bangumi_watch_status();
+
+        let library = library_handle.read();
+        if let Err(e) = library {
+            log::debug!("Library lock poisoned: {:?}", e);
+            return true;
+        }
+        log::debug!("Library locked successfully.");
+        let mut library = library.unwrap();
+
+        let subject_ids: Vec<i32> = library.iter().map(|series| {
+            series.seasons.iter().map(|season| {
+                season.bangumi_subject_id
+            }).collect::<Vec<i32>>()
+        }).flatten().collect();
+
+        drop(library);
+
+        // Spawn a thread for each subject ID,
+        // getting Episode status using get_bangumi_episode_collection_status
+        // result passed by mpsc channel, for each result, once received, update the library immedialy (TODO)
+        // and fill the status field of each episode
+        let (tx, rx) = mpsc::channel();
+        let handles: Vec<_> = subject_ids.into_iter().map(|subject_id| {
+            let tx = tx.clone();
+            thread::spawn(move || {
+                // delay random time from 0~1000
+                thread::sleep(Duration::from_millis(rand::thread_rng().gen_range(0..1000)));
+                let status = retry::retry(retry::delay::Fixed::from_millis(1000).take(5), || {
+                    get_bangumi_episode_collection_status(subject_id)
+                }).unwrap();
+                tx.send((subject_id, status)).unwrap();
+            })
+        }).collect();
+
+        let mut succ_count = 0;
+        for handle in handles {
+            let res = handle.join();
+            if res.is_ok() {
+                succ_count += 1;
+            }
+        }
+
+        let library = library_handle.write();
+        if let Err(e) = library {
+            log::debug!("Library lock poisoned: {:?}", e);
+            return true;
+        }
+        log::debug!("Library locked successfully.");
+        let mut library = library.unwrap();
+        log::debug!("Library get.");
+
+        let mut count = 0;
+        for (subject_id, status) in rx.iter() {
+            log::debug!("Subject ID: {}", subject_id);
+            // Update library for a SUBJECT
+            for series in library.iter_mut() {
+                for season in series.seasons.iter_mut() {
+                    if season.bangumi_subject_id == subject_id {
+                        // Match a SEASON in the labrary with subject_id
+                        for episode in season.episodes.iter_mut() {
+                            // Match an EPISODE's sort in the SEASON with disp_episode_num - season's tmdb_episode_offset + bangumi_episode_offset
+                            let episode_sort = (episode.disp_episode_num - season.conf_tmdb_episode_offset + season.conf_bangumi_episode_offset).to_string();
+                            for s in status.iter() {
+                                if s.sort == episode_sort {
+                                    episode.bangumi_sort = s.sort.clone();
+                                    episode.bangumi_airdate = s.airdate.clone();
+                                    episode.bangumi_name = s.name.clone();
+                                    episode.bangumi_name_cn = s.name_cn.clone();
+                                    episode.bangumi_ep_type = s.ep_type.clone();
+                                    episode.bangumi_status = s.status.clone();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            count += 1;
+            if count == succ_count {
+                break;
+            }
+        }
+
+        log::debug!("Bangumi status fetched successfully.");
+        drop(library);
+        false
     }
 }

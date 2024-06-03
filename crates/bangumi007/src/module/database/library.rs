@@ -248,10 +248,6 @@ pub fn set_season_bangumi_episode_offset(mikan_subject_id: i32, mikan_subgroup_i
         "update library_anime_season set conf_bangumi_episode_offset = ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
         &[&new_offset, &mikan_subject_id, &mikan_subgroup_id],
     ).unwrap();
-    conn.execute(
-        "update library_anime_season_item set disp_episode_num = mikan_parsed_episode_num + ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
-        &[&new_offset, &mikan_subject_id, &mikan_subgroup_id],
-    ).unwrap();
 }
 
 pub fn get_season_conf_season_num(mikan_subject_id: i32, mikan_subgroup_id: i32) -> i32 {
@@ -304,7 +300,7 @@ pub struct AnimeSeasonItem {
     pub disp_episode_num: i32,
     pub bangumi_parsed_episode_id: i32,
     pub bangumi_parsed_episode_ep: i32,
-    pub bangumi_parsed_episode_sort: i32,
+    pub bangumi_parsed_episode_sort: String,
 }
 
 #[deny(dead_code)]
@@ -328,8 +324,9 @@ pub fn init_cache_library_anime_season_item_table(conn: &Connection) -> Result<(
             disp_episode_num integer,
             bangumi_parsed_episode_id integer,
             bangumi_parsed_episode_ep integer,
-            bangumi_parsed_episode_sort integer
+            bangumi_parsed_episode_sort text
         )",
+        // TODO: bangumi_parsed_episode_id, bangumi_parsed_episode_ep, bangumi_parsed_episode_sort deprecated
         [],
     )?;
     Ok(())

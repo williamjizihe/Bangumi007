@@ -523,6 +523,7 @@ dependencies = [
  "log",
  "log4rs",
  "minidom",
+ "rand",
  "regex",
  "reqwest",
  "retry",

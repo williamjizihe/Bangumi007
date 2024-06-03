@@ -308,8 +308,8 @@ pub fn get_bangumi_episodes(bangumi_subject_id: i32) -> Result<Vec<BangumiEpisod
         let episode_sort = episode
             .get("sort")
             .ok_or_else(|| new_warn("Failed to get episode sort"))
-            .and_then(|x| x.as_i64().ok_or_else(|| new_warn("Failed to get episode sort as i64")))
-            .and_then(|x| x.try_into().map_err(|_| new_warn("Failed to convert episode sort to i32")));
+            .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get episode sort as str")))
+            .and_then(|x| Ok(x.to_string()));
         let episode_sort = match episode_sort {
             Ok(episode_sort) => episode_sort,
             Err(_) => continue,
@@ -367,15 +367,15 @@ pub fn get_bangumi_episodes(bangumi_subject_id: i32) -> Result<Vec<BangumiEpisod
 }
 
 pub fn parse_bangumi_episode(bangumi_subject_id: i32, mikan_episode_num: i32, episode_type: i32) -> Result<BangumiEpisode, Box<dyn Error>> {
-    let episodes = get_bangumi_episodes(bangumi_subject_id)?;
-    let episode = episodes.iter().find(|x| x.episode_sort == mikan_episode_num && x.episode_type == episode_type);
-    if episode.is_some() {
-        return Ok(episode.unwrap().clone());
-    }
-    let episode = episodes.iter().find(|x| x.episode_ep == mikan_episode_num && x.episode_type == episode_type);
-    if episode.is_some() {
-        return Ok(episode.unwrap().clone());
-    }
+    // let episodes = get_bangumi_episodes(bangumi_subject_id)?;
+    // let episode = episodes.iter().find(|x| x.episode_sort == mikan_episode_num && x.episode_type == episode_type);
+    // if episode.is_some() {
+    //     return Ok(episode.unwrap().clone());
+    // }
+    // let episode = episodes.iter().find(|x| x.episode_ep == mikan_episode_num && x.episode_type == episode_type);
+    // if episode.is_some() {
+    //     return Ok(episode.unwrap().clone());
+    // }
     Err(new_err("Failed to find episode"))
 }
 

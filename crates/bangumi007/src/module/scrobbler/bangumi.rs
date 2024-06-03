@@ -1,19 +1,44 @@
 use std::error::Error;
+
 use serde_json::json;
+use eframe::egui::Color32;
+
 use crate::module::config::CONFIG;
 use crate::module::parser::bangumi_parser::get_bangumi_episodes;
 use crate::module::utils::error::new_err;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum BangumiEpisodeStatus {
+    #[default]
     NotCollected,
     WantToWatch,
     Watched,
     Dropped,
 }
 
-#[derive(Debug)]
+impl BangumiEpisodeStatus {
+    pub(crate) fn get_fill_color(&self, date: String) -> impl Into<Color32> + Sized {
+        match self {
+            BangumiEpisodeStatus::NotCollected => Color32::from_rgb(170, 197, 230),
+            BangumiEpisodeStatus::WantToWatch => Color32::from_rgb(255, 173, 209),
+            BangumiEpisodeStatus::Watched => Color32::from_rgb(72, 151, 255),
+            BangumiEpisodeStatus::Dropped => Color32::from_rgb(204, 204, 204),
+        }
+    }
+
+    pub(crate) fn get_text_color(&self, date: String) -> impl Into<Color32> + Sized {
+        match self {
+            BangumiEpisodeStatus::NotCollected => Color32::from_rgb(0, 102, 204),
+            BangumiEpisodeStatus::WantToWatch => Color32::from_rgb(163, 73, 164),
+            BangumiEpisodeStatus::Watched => Color32::from_rgb(255, 255, 255),
+            BangumiEpisodeStatus::Dropped => Color32::from_rgb(154, 144, 144),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
 pub enum BangumiEpisodeType {
+    #[default]
     MainStory,
     Special,
     OP,
@@ -23,14 +48,14 @@ pub enum BangumiEpisodeType {
 
 #[derive(Debug)]
 pub struct BangumiEpisodeCollection {
-    id: i32,
-    sort: i32,
-    ep: i32,
-    airdate: String,
-    name: String,
-    name_cn: String,
-    ep_type: BangumiEpisodeType,
-    status: BangumiEpisodeStatus,
+    pub id: i32,
+    pub sort: String,
+    pub ep: i32,
+    pub airdate: String,
+    pub name: String,
+    pub name_cn: String,
+    pub ep_type: BangumiEpisodeType,
+    pub status: BangumiEpisodeStatus,
 }
 
 pub fn get_bangumi_episode_collection_status(bangumi_subject_id: i32) -> Result<Vec<BangumiEpisodeCollection>, Box<dyn Error>> {
@@ -81,8 +106,9 @@ pub fn get_bangumi_episode_collection_status(bangumi_subject_id: i32) -> Result<
                 .and_then(|i| i.as_i64())
                 .ok_or_else(|| new_err("Failed to parse id"))? as i32,
             sort: episode.get("sort")
-                .and_then(|s| s.as_i64())
-                .ok_or_else(|| new_err("Failed to parse sort"))? as i32,
+                .and_then(|s| s.as_f64())
+                .and_then(|s| Some(s.to_string()))
+                .ok_or_else(|| new_err(format!("Failed to parse sort: {:?}", episode).as_str()))?,
             ep: episode.get("ep")
                 .and_then(|e| e.as_i64())
                 .ok_or_else(|| new_err("Failed to parse ep"))? as i32,
@@ -117,7 +143,7 @@ pub fn get_bangumi_episode_collection_status(bangumi_subject_id: i32) -> Result<
     Ok(result)
 }
 
-pub fn update_bangumi_episode_status(bangumi_subject_id: i32, bangumi_episode_sort: i32, status: BangumiEpisodeStatus) -> Result<(), Box<dyn Error>> {
+pub fn update_bangumi_episode_status(bangumi_subject_id: i32, bangumi_episode_sort: String, status: BangumiEpisodeStatus) -> Result<(), Box<dyn Error>> {
     // First, get all the episode ids of the bangumi subject
     let episodes = get_bangumi_episodes(bangumi_subject_id)
         .map_err(|e| new_err(&format!("Failed to get bangumi episodes: {}", e)))?;
@@ -172,6 +198,7 @@ pub fn update_bangumi_episode_status(bangumi_subject_id: i32, bangumi_episode_so
 #[cfg(test)]
 mod tests {
     use crate::module::logger;
+
     use super::*;
 
     #[test]

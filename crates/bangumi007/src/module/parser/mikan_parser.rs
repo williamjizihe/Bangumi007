@@ -199,7 +199,7 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
             mikan_parsed_codec: parse_filename_to_codec(&title),                 // Codec
             bangumi_parsed_episode_id: -1,
             bangumi_parsed_episode_ep: -1,
-            bangumi_parsed_episode_sort: -1,
+            bangumi_parsed_episode_sort: "".to_string(),
         });
     }
 
@@ -465,23 +465,23 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
         None => 0
     };
 
-    let bangumi_episode_info = match &mikan_subject_info {
-        Some(info) => {
-            let episode_info = parse_bangumi_episode(info.bangumi_subject_id,
-                                                     item.mikan_parsed_episode_num + episode_offset,
-                                                     0);
-            match episode_info {
-                Ok(info) => Some(info),
-                Err(_) => None
-            }
-        }
-        None => None
-    };
+    // let bangumi_episode_info = match &mikan_subject_info {
+    //     Some(info) => {
+    //         let episode_info = parse_bangumi_episode(info.bangumi_subject_id,
+    //                                                  item.mikan_parsed_episode_num + episode_offset,
+    //                                                  0);
+    //         match episode_info {
+    //             Ok(info) => Some(info),
+    //             Err(_) => None
+    //         }
+    //     }
+    //     None => None
+    // };
 
-    let (bangumi_parsed_episode_id, bangumi_parsed_episode_ep, bangumi_parsed_episode_sort) = match &bangumi_episode_info {
-        Some(info) => (info.episode_id, info.episode_ep, info.episode_sort),
-        None => (-1, -1, -1)
-    };
+    // let (bangumi_parsed_episode_id, bangumi_parsed_episode_ep, bangumi_parsed_episode_sort) = match &bangumi_episode_info {
+    //     Some(info) => (info.episode_id, info.episode_ep, info.episode_sort.clone()),
+    //     None => (-1, -1, "".to_string())
+    // };
 
     Ok(MikanItem {
         mikan_item_uuid: item.mikan_item_uuid.to_string(),
@@ -498,9 +498,9 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
         mikan_parsed_episode_num: item.mikan_parsed_episode_num + episode_offset,
         mikan_parsed_language: item.mikan_parsed_language.to_string(),
         mikan_parsed_codec: item.mikan_parsed_codec.to_string(),
-        bangumi_parsed_episode_id,
-        bangumi_parsed_episode_ep,
-        bangumi_parsed_episode_sort,
+        bangumi_parsed_episode_id: -1,
+        bangumi_parsed_episode_ep: -1,
+        bangumi_parsed_episode_sort: "".to_string(),
     })
 }
 
