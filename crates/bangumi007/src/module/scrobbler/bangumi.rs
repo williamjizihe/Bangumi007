@@ -211,6 +211,6 @@ mod tests {
     #[test]
     fn test_update_bangumi_episode_status() {
         logger::init();
-        update_bangumi_episode_status(425909, 7, BangumiEpisodeStatus::Watched).unwrap();
+        update_bangumi_episode_status(425909, "7".to_string(), BangumiEpisodeStatus::Watched).unwrap();
     }
 }
