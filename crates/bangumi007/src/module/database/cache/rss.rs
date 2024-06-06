@@ -23,7 +23,7 @@ pub struct MikanItem {
     pub mikan_parsed_codec: String,
     pub bangumi_parsed_episode_id: i32,
     pub bangumi_parsed_episode_ep: i32,
-    pub bangumi_parsed_episode_sort: i32,
+    pub bangumi_parsed_episode_sort: String,
 }
 
 #[deny(dead_code)]
@@ -46,8 +46,9 @@ pub fn init_cache_mikan_item_table(conn: &Connection) -> Result<(), Box<dyn Erro
             mikan_parsed_codec text,
             bangumi_parsed_episode_id integer,
             bangumi_parsed_episode_ep integer,
-            bangumi_parsed_episode_sort integer
+            bangumi_parsed_episode_sort text
         )",
+        // TODO: bangumi_parsed_episode_id, bangumi_parsed_episode_ep, bangumi_parsed_episode_sort deprecated
         [],
     )?;
     Ok(())
@@ -269,7 +270,7 @@ pub struct BangumiEpisode {
     pub episode_id: i32,
     pub episode_type: i32,
     pub episode_ep: i32,    // raw index of episode
-    pub episode_sort: i32,  // display index of episode
+    pub episode_sort: String,  // display index of episode
     pub episode_name: String,
     pub episode_name_cn: String,
     pub episode_airdate: String,

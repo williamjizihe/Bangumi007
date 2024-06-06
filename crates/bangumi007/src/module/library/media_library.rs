@@ -66,10 +66,11 @@ pub fn update_library(items: &Vec<rss::MikanItem>) {
                         disp_season_name,
                         disp_subgroup_name,
                         disp_season_num,
-                        conf_episode_offset: 0,
+                        conf_tmdb_episode_offset: 0,
                         conf_language: "".to_string(),
                         conf_codec: "".to_string(),
                         conf_season_num: -1,
+                        conf_bangumi_episode_offset: 0,
                     };
                     create_season(&season);
                     create_item(&item);
@@ -129,11 +130,12 @@ pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_item
     let conn = get_connection().unwrap();
 
     conn.execute(
-        "update library_anime_season set conf_episode_offset = ?1, conf_language = ?2, conf_codec = ?3 where mikan_subject_id = ?4 and mikan_subgroup_id = ?5",
+        "update library_anime_season set conf_tmdb_episode_offset = ?1, conf_language = ?2, conf_codec = ?3, conf_bangumi_episode_offset = ?4 where mikan_subject_id = ?5 and mikan_subgroup_id = ?6",
         &[
-            &season.conf_episode_offset.to_string(),
+            &season.conf_tmdb_episode_offset.to_string(),
             &season.conf_language,
             &season.conf_codec,
+            &season.conf_bangumi_episode_offset.to_string(),
             &season.mikan_subject_id.to_string(),
             &season.mikan_subgroup_id.to_string(),
         ],
@@ -155,11 +157,11 @@ pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_item
     // for items in library_anime_season_item, 
     // where mikan_subject_id = season.mikan_subject_id 
     // and mikan_subgroup_id = season.mikan_subgroup_id,
-    // update disp_episode_num = mikan_parsed_episode_num + conf_episode_offset
+    // update disp_episode_num = mikan_parsed_episode_num + conf_tmdb_episode_offset
     conn.execute(
         "update library_anime_season_item set disp_episode_num = mikan_parsed_episode_num + ?1 where mikan_subject_id = ?2 and mikan_subgroup_id = ?3",
         &[
-            &season.conf_episode_offset.to_string(),
+            &season.conf_tmdb_episode_offset.to_string(),
             &season.mikan_subject_id.to_string(),
             &season.mikan_subgroup_id.to_string(),
         ],
@@ -168,7 +170,7 @@ pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_item
     // fetch items from the rss feed
     // TODO: fetch with updated config
     if fetch_items {
-        let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", season.mikan_subject_id, season.mikan_subgroup_id);
+        let url = format!("https://mikanime.tv/RSS/Bangumi?bangumiId={}&subgroupid={}", season.mikan_subject_id, season.mikan_subgroup_id);
         let items = mikan_parser::update_rss(&url).unwrap();
         let items = mikan_parser::expand_history_episodes(items);
         update_library(&items);

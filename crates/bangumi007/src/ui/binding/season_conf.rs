@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use crate::module::database::library::{AnimeSeason, read_all_items, read_season_items, read_seasons, set_season_conf_season_num, set_season_disp_season_num, set_season_episode_offset};
+use crate::module::database::library::{AnimeSeason, read_all_items, read_season_items, read_seasons, set_season_bangumi_episode_offset, set_season_conf_season_num, set_season_disp_season_num, set_season_tmdb_episode_offset};
 use crate::module::downloader::qbittorrent::{clean_empty_folders, download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
@@ -17,14 +17,17 @@ pub struct SeasonConf {
     pub conf_season_changed: bool,
     pub ep_num_min: i32,
     pub ep_num_max: i32,
-    pub conf_ep_offset: i32,
+    pub conf_tmdb_ep_offset: i32,
+    pub conf_bangumi_ep_offset: i32,
 }
 
 pub fn update_conf(conf: SeasonConf, library: Arc<RwLock<Vec<AppAnimeSeries>>>) {
 
+    let library_handle = library.clone();
+
     log::info!("Update season conf");
 
-    let library = library.clone();
+    let library = library_handle.clone();
 
     let handle = thread::spawn(move || {
 
@@ -48,7 +51,8 @@ pub fn update_conf(conf: SeasonConf, library: Arc<RwLock<Vec<AppAnimeSeries>>>) 
         }
         set_season_disp_season_num(conf.subject_id, conf.subgroup_id, conf.conf_season);
 
-        set_season_episode_offset(conf.subject_id, conf.subgroup_id, conf.conf_ep_offset);
+        set_season_tmdb_episode_offset(conf.subject_id, conf.subgroup_id, conf.conf_tmdb_ep_offset);
+        set_season_bangumi_episode_offset(conf.subject_id, conf.subgroup_id, conf.conf_bangumi_ep_offset);
 
         *library = Vec::new();
         // Output media library
@@ -91,7 +95,11 @@ pub fn update_conf(conf: SeasonConf, library: Arc<RwLock<Vec<AppAnimeSeries>>>) 
         clean_empty_folders("".to_string());
 
         log::info!("RSS updated successfully.");
-        // drop(library);
+        drop(library);
+
+        if LibraryApp::fetch_bangumi_watch_status(library_handle) { return; }
+
     });
+
 }
 

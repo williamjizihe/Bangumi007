@@ -12,9 +12,10 @@ use eframe::egui::{Align, ecolor};
 
 use crate::module::core::init::run_init;
 use crate::ui::mainapp::egui::RichText;
-use crate::ui::apps::libraryapp::LibraryApp;
+use crate::ui::apps::libraryapp::{BANGUMI_STATUS_UPDATE, LibraryApp};
 use crate::ui::apps::logapp::LogApp;
 use crate::ui::apps::panel::Panel;
+use crate::ui::apps::panel::Panel::Library;
 use crate::ui::apps::season_conf_dialog_window::SeasonConfDialogWindow;
 use crate::ui::apps::settingsapp::SettingsApp;
 
@@ -175,5 +176,16 @@ impl eframe::App for MainApp {
             let series = self.library_app.library.clone();
             season_conf_dialog_window.show(ctx, series);
         }
+
+        let flag_handle = BANGUMI_STATUS_UPDATE.read().unwrap();
+        if (*flag_handle) {
+            drop(flag_handle);
+
+            let library_handle = self.library_app.library.clone();
+            LibraryApp::fetch_bangumi_watch_status(library_handle);
+
+        }
+
+
     }
 }

@@ -2,8 +2,12 @@
 .idea
 
 /log
+/data
 /data/database
 /data/config
 
 *.log
 *.db
+
+/crates/bangumi007/data
+/crates/bangumi007/log

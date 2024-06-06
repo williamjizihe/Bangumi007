@@ -18,6 +18,7 @@ pub struct AppConfig {
     pub log_config: LogConfig,
     pub downloader_config: DownloaderConfig,
     pub parser_config: ParserConfig,
+    pub scrobbler_config: ScrobblerConfig,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -66,6 +67,12 @@ pub struct TMDBConfig {
     pub include_adult: bool,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ScrobblerConfig {
+    pub enabled: bool,
+    pub bangumi_access_token: String,
+}
+
 impl AppConfig {
     fn default() -> Self {
         AppConfig {
@@ -98,6 +105,10 @@ impl AppConfig {
                     include_adult: false,
                 },
             },
+            scrobbler_config: ScrobblerConfig {
+                enabled: false,
+                bangumi_access_token: "FILL_IN_BANGUMI_ACCESS_TOKEN".to_string(),
+            }
         }
     }
 
