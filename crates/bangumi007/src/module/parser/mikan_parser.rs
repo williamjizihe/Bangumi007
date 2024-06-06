@@ -250,7 +250,7 @@ pub fn update_rss(url: &str) -> Result<Vec<MikanItem>, Box<dyn Error>> {
 pub fn expand_history_episodes(items: Vec<MikanItem>) -> Vec<MikanItem> {
     // Expand the RSS and get history episodes
     // For each item in items, get its bangumi id and subgroup id
-    // Then visit https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}
+    // Then visit https://mikanime.tv/RSS/Bangumi?bangumiId={}&subgroupid={}
     // Parse the RSS and get all the episodes
     let mut result = Vec::new();
     // HashSet to store visited bgm-sub pairs
@@ -259,7 +259,7 @@ pub fn expand_history_episodes(items: Vec<MikanItem>) -> Vec<MikanItem> {
         if visited.contains(&(item.mikan_subject_id, item.mikan_subgroup_id)) {
             continue;
         }
-        let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", item.mikan_subject_id, item.mikan_subgroup_id);
+        let url = format!("https://mikanime.tv/RSS/Bangumi?bangumiId={}&subgroupid={}", item.mikan_subject_id, item.mikan_subgroup_id);
         let items_full = update_rss(&url).unwrap();
         // Add to the result
         for item in items_full {
@@ -289,7 +289,7 @@ pub fn expand_history_episodes(items: Vec<MikanItem>) -> Vec<MikanItem> {
 ///
 fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error>> {
     // build url from item's uuid
-    let url = format!("https://mikanani.me/Home/Episode/{}", item.mikan_item_uuid);
+    let url = format!("https://mikanime.tv/Home/Episode/{}", item.mikan_item_uuid);
 
     let response = retry(Fixed::from_millis(5000), || {
         match get(&url) {
@@ -369,7 +369,7 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
             let start = response[x..].find("url(\'").ok_or_else(|| new_err("Failed to parse image"))?;
             let start = x + start + 5;
             let end = response[start..].find("\'").ok_or_else(|| new_err("Failed to parse image"))?;
-            let url = format!("https://mikanani.me{}", response[start..start + end].to_string()).to_string();
+            let url = format!("https://mikanime.tv{}", response[start..start + end].to_string()).to_string();
             Ok(url)
         })
         .unwrap_or("".to_string());
@@ -513,9 +513,9 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
 ///
 /// ## Procedure
 ///
-/// e.g. https://mikanani.me/Home/Bangumi/3344
+/// e.g. https://mikanime.tv/Home/Bangumi/3344
 ///
-/// 1. Visit the page https://mikanani.me/Home/Bangumi/3344
+/// 1. Visit the page https://mikanime.tv/Home/Bangumi/3344
 /// 2. Parse the page and get the bangumi id & url https://bgm.tv/subject/444557
 ///
 /// ## Output
@@ -523,7 +523,7 @@ fn fill_episode_information(item: &MikanItem) -> Result<MikanItem, Box<dyn Error
 /// Bangui subject id : `i32`
 pub fn get_bangumi_subject_id(mikan_subject_id: i32) -> rusqlite::Result<i32, Box<dyn Error>> {
     // build url from item's uuid
-    let url = format!("https://mikanani.me/Home/Bangumi/{}", mikan_subject_id);
+    let url = format!("https://mikanime.tv/Home/Bangumi/{}", mikan_subject_id);
 
     let response = retry::retry(Fixed::from_millis(5000), || {
         match get(&url) {
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn test_parse_rss() {
-        let url = "https://mikanani.me/RSS/Bangumi?bangumiId=3305&subgroupid=382";
+        let url = "https://mikanime.tv/RSS/Bangumi?bangumiId=3305&subgroupid=382";
         let items = update_rss(url).unwrap();
         for item in items {
             println!("{:?}", item);

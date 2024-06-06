@@ -280,6 +280,43 @@ pub fn set_season_disp_season_num(mikan_subject_id: i32, mikan_subgroup_id: i32,
     ).unwrap();
 }
 
+pub fn find_season_by_disp(disp_series_name: String, disp_season_num: i32) -> Option<AnimeSeason> {
+    let conn = get_connection().unwrap();
+    let mut stmt = conn.prepare("select * from library_anime_season where disp_series_name = ?1 and disp_season_num = ?2").unwrap();
+    let season_iter = stmt.query_map(&[&disp_series_name, &disp_season_num.to_string()], |row| {
+        Ok(AnimeSeason {
+            mikan_subject_id: row.get(0)?,
+            mikan_subgroup_id: row.get(1)?,
+            mikan_subject_name: row.get(2)?,
+            mikan_subject_image: row.get(3)?,
+            bangumi_subject_id: row.get(4)?,
+            bangumi_subject_name: row.get(5)?,
+            bangumi_season_num: row.get(6)?,
+            bangumi_subject_image: row.get(7)?,
+            tmdb_series_id: row.get(8)?,
+            tmdb_series_name: row.get(9)?,
+            tmdb_season_num: row.get(10)?,
+            tmdb_season_name: row.get(11)?,
+            bangumi_to_tmdb_episode_offset: row.get(12)?,
+            disp_series_name: row.get(13)?,
+            disp_season_name: row.get(14)?,
+            disp_subgroup_name: row.get(15)?,
+            disp_season_num: row.get(16)?,
+            conf_tmdb_episode_offset: row.get(17)?,
+            conf_language: row.get(18)?,
+            conf_codec: row.get(19)?,
+            conf_season_num: row.get(20)?,
+            conf_bangumi_episode_offset: row.get(21)?,
+        })
+    }).unwrap();
+
+    for season in season_iter {
+        return season.ok();
+    }
+
+    None
+}
+
 
 #[derive(Debug, Clone)]
 pub struct AnimeSeasonItem {

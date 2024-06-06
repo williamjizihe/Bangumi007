@@ -3,6 +3,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
+use lazy_static::lazy_static;
 
 use eframe::egui;
 use eframe::egui::{RichText, vec2};
@@ -17,6 +18,10 @@ pub struct LibraryApp {
     pub library: Arc<RwLock<Vec<AppAnimeSeries>>>,
 }
 
+lazy_static!(
+    // flag for bangumi status update
+    pub static ref BANGUMI_STATUS_UPDATE: Arc<RwLock<bool>> = Arc::new(RwLock::new(false));
+);
 
 impl LibraryApp {
     fn series_layout(&mut self, ui: &mut egui::Ui, series: &AppAnimeSeries, season_conf_dialog_window: Rc<RefCell<SeasonConfDialogWindow>>) {

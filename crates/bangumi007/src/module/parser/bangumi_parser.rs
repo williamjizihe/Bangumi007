@@ -308,7 +308,7 @@ pub fn get_bangumi_episodes(bangumi_subject_id: i32) -> Result<Vec<BangumiEpisod
         let episode_sort = episode
             .get("sort")
             .ok_or_else(|| new_warn("Failed to get episode sort"))
-            .and_then(|x| x.as_str().ok_or_else(|| new_warn("Failed to get episode sort as str")))
+            .and_then(|x| x.as_i64().ok_or_else(|| new_warn(&*format!("Failed to get episode sort as str: {:?}", x))))
             .and_then(|x| Ok(x.to_string()));
         let episode_sort = match episode_sort {
             Ok(episode_sort) => episode_sort,

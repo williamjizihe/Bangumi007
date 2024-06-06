@@ -195,6 +195,11 @@ pub fn update_bangumi_episode_status(bangumi_subject_id: i32, bangumi_episode_so
     Ok(())
 }
 
+pub fn update_bangumi_episode_status_send(bangumi_subject_id: i32, bangumi_episode_sort: String, status: BangumiEpisodeStatus) -> bool {
+    let res = update_bangumi_episode_status(bangumi_subject_id, bangumi_episode_sort, status);
+    return res.is_err();
+}
+
 #[cfg(test)]
 mod tests {
     use crate::module::logger;

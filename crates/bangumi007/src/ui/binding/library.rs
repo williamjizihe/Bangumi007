@@ -8,7 +8,7 @@ use crate::module::downloader::qbittorrent::{clean_empty_folders, download_items
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
 use crate::module::scrobbler::bangumi::get_bangumi_episode_collection_status;
-use crate::ui::apps::libraryapp::{AppAnimeEpisode, AppAnimeSeason, AppAnimeSeries, LibraryApp};
+use crate::ui::apps::libraryapp::{AppAnimeEpisode, AppAnimeSeason, AppAnimeSeries, BANGUMI_STATUS_UPDATE, LibraryApp};
 
 impl LibraryApp {
     pub fn update_rss(&mut self) {
@@ -249,6 +249,11 @@ impl LibraryApp {
 
         log::debug!("Bangumi status fetched successfully.");
         drop(library);
+
+        let mut flag_handle = BANGUMI_STATUS_UPDATE.write().unwrap();
+        *flag_handle = false;
+        drop(flag_handle);
+
         false
     }
 }

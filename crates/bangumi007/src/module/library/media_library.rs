@@ -130,7 +130,7 @@ pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_item
     let conn = get_connection().unwrap();
 
     conn.execute(
-        "update library_anime_season set conf_tmdb_episode_offset = ?1, conf_language = ?2, conf_codec = ?3, conf_bangumi_episode_offset = ?4, where mikan_subject_id = ?5 and mikan_subgroup_id = ?6",
+        "update library_anime_season set conf_tmdb_episode_offset = ?1, conf_language = ?2, conf_codec = ?3, conf_bangumi_episode_offset = ?4 where mikan_subject_id = ?5 and mikan_subgroup_id = ?6",
         &[
             &season.conf_tmdb_episode_offset.to_string(),
             &season.conf_language,
@@ -170,7 +170,7 @@ pub fn update_season_config(season: &AnimeSeason, delete_items: bool, fetch_item
     // fetch items from the rss feed
     // TODO: fetch with updated config
     if fetch_items {
-        let url = format!("https://mikanani.me/RSS/Bangumi?bangumiId={}&subgroupid={}", season.mikan_subject_id, season.mikan_subgroup_id);
+        let url = format!("https://mikanime.tv/RSS/Bangumi?bangumiId={}&subgroupid={}", season.mikan_subject_id, season.mikan_subgroup_id);
         let items = mikan_parser::update_rss(&url).unwrap();
         let items = mikan_parser::expand_history_episodes(items);
         update_library(&items);

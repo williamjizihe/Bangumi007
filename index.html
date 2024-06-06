@@ -183,26 +183,53 @@
         // 如有变化，说明视频播放进度发生变化，触发console.log
         //<div class="osdTextContainer startTimeText osdPositionText" style="margin:0 .25em 0 0">0:47</div>
 
+        let last_series = '';
+        let last_season = '';
+        let last_episode = '';
+
         var observer = new MutationObserver(function (mutations) {
             mutations.forEach(function (mutation) {
                 let title = document.querySelector('h3.pageTitle');
                 // take "(series name) - S(/d+)E(/d+) - "
                 let re = /(.*) - S(\d+):E(\d+) - (.*)/;
                 let match = re.exec(title.textContent);
-                if (match) {
-                    console.log(match[1] + ' S' + match[2] + ' E' + match[3] + ' Time:' + mutation.target.textContent);
-                } else {
-                    if (title) {
-                        console.log(title.textContent, mutation.target.textContent);
-                    } else {
-                        console.log(mutation.target.textContent);
-                    }
+                if (!match) {
+                    return;
+                }
+                let series = match[1];
+                let season = match[2];
+                let episode = match[3];
+                if (series === last_series && season === last_season && episode === last_episode) {
+                    return;
+                }
+                re = /-(\d+):(\d+)/;
+                match = re.exec(mutation.target.textContent);
+                let minutes = parseInt(match[1]);
+                let seconds = parseInt(match[2]);
+                seconds = minutes * 60 + seconds;
+                if (seconds > 0 && seconds < 90) {
+                    // GET localhost:8007/report?series={}&season={}&episode={}&status=1
+                    // If success, set last_series, last_season, last_episode
+                    let backup_series = last_series;
+                    let backup_season = last_season;
+                    let backup_episode = last_episode;
+                    last_series = series;
+                    last_season = season;
+                    last_episode = episode;
+                    let url = `http://localhost:8007/report?series=${series}&season=${season}&episode=${episode}&status=1`;
+                    fetch(url).then(response => {
+                        if (!response.ok) {
+                            last_series = backup_series;
+                            last_season = backup_season;
+                            last_episode = backup_episode;
+                        }
+                    });
                 }
             });
         });
 
         while (true) {
-            let targetElement = document.querySelector('.osdTextContainer.startTimeText.osdPositionText');
+            let targetElement = document.querySelector('div.osdTextContainer.endTimeText.osdDurationText');
             // if not null
             if (targetElement) {
                 // configuration of the observer:

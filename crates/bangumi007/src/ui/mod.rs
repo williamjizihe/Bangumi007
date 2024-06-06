@@ -1,3 +1,3 @@
 pub mod mainapp;
-mod apps;
-mod binding;
+pub mod apps;
+pub mod binding;
