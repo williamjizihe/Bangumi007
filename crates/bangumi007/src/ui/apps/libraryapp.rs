@@ -205,7 +205,7 @@ impl From<crate::module::database::library::AnimeSeasonItem> for AppAnimeEpisode
             bangumi_airdate: "".to_string(),
             bangumi_name: "".to_string(),
             bangumi_name_cn: "".to_string(),
-            bangumi_ep_type: BangumiEpisodeType::MainStory,
+            bangumi_ep_type: BangumiEpisodeType::from(episode.bangumi_episode_type),
             bangumi_status: BangumiEpisodeStatus::NotCollected,
         }
     }

@@ -46,6 +46,18 @@ pub enum BangumiEpisodeType {
     Other,
 }
 
+impl From<i32> for BangumiEpisodeType {
+    fn from(value: i32) -> Self {
+        match value {
+            0 => BangumiEpisodeType::MainStory,
+            1 => BangumiEpisodeType::Special,
+            2 => BangumiEpisodeType::OP,
+            3 => BangumiEpisodeType::ED,
+            _ => BangumiEpisodeType::Other,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct BangumiEpisodeCollection {
     pub id: i32,

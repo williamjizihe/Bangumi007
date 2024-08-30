@@ -338,6 +338,7 @@ pub struct AnimeSeasonItem {
     pub bangumi_parsed_episode_id: i32,
     pub bangumi_parsed_episode_ep: i32,
     pub bangumi_parsed_episode_sort: String,
+    pub bangumi_episode_type: i32,
 }
 
 #[deny(dead_code)]
@@ -361,7 +362,8 @@ pub fn init_cache_library_anime_season_item_table(conn: &Connection) -> Result<(
             disp_episode_num integer,
             bangumi_parsed_episode_id integer,
             bangumi_parsed_episode_ep integer,
-            bangumi_parsed_episode_sort text
+            bangumi_parsed_episode_sort text,
+            bangumi_episode_type integer
         )",
         // TODO: bangumi_parsed_episode_id, bangumi_parsed_episode_ep, bangumi_parsed_episode_sort deprecated
         [],
@@ -393,8 +395,9 @@ pub fn create_item(item: &crate::module::database::cache::rss::MikanItem) {
             disp_episode_num,
             bangumi_parsed_episode_id,
             bangumi_parsed_episode_ep,
-            bangumi_parsed_episode_sort
-        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+            bangumi_parsed_episode_sort,
+            bangumi_episode_type
+        ) values (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
         &[
             &item.mikan_item_uuid,
             &item.mikan_subject_id.to_string(),
@@ -414,6 +417,7 @@ pub fn create_item(item: &crate::module::database::cache::rss::MikanItem) {
             &item.bangumi_parsed_episode_id.to_string(),
             &item.bangumi_parsed_episode_ep.to_string(),
             &item.bangumi_parsed_episode_sort.to_string(),
+            &0.to_string(),     // TODO: P0 bangumi_episode_type from parser
         ],
     ).unwrap();
 }
@@ -451,6 +455,7 @@ pub fn read_season_items(mikan_subject_id: i32, mikan_subgroup_id: i32) -> Vec<A
             bangumi_parsed_episode_id: row.get(15)?,
             bangumi_parsed_episode_ep: row.get(16)?,
             bangumi_parsed_episode_sort: row.get(17)?,
+            bangumi_episode_type: row.get(18)?,
         })
     }).unwrap();
 
@@ -486,6 +491,7 @@ pub fn read_all_items() -> Vec<AnimeSeasonItem> {
             bangumi_parsed_episode_id: row.get(15)?,
             bangumi_parsed_episode_ep: row.get(16)?,
             bangumi_parsed_episode_sort: row.get(17)?,
+            bangumi_episode_type: row.get(18)?,
         })
     }).unwrap();
 

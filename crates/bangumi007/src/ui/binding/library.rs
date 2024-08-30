@@ -7,7 +7,8 @@ use crate::module::database::library::{AnimeSeason, read_all_items, read_season_
 use crate::module::downloader::qbittorrent::{clean_empty_folders, download_items, rename_torrents_files};
 use crate::module::library::{auto_season_config_clean, update_library};
 use crate::module::parser::mikan_parser::{expand_history_episodes, update_rss};
-use crate::module::scrobbler::bangumi::get_bangumi_episode_collection_status;
+use crate::module::scrobbler::bangumi::BangumiEpisodeType::MainStory;
+use crate::module::scrobbler::bangumi::{BangumiEpisodeCollection, get_bangumi_episode_collection_status};
 use crate::ui::apps::libraryapp::{AppAnimeEpisode, AppAnimeSeason, AppAnimeSeries, BANGUMI_STATUS_UPDATE, LibraryApp};
 
 impl LibraryApp {
@@ -171,7 +172,7 @@ impl LibraryApp {
             log::debug!("Library lock poisoned: {:?}", e);
             return true;
         }
-        log::debug!("Library locked successfully.");
+        log::debug!("(fetch_bangumi_watch_status) Library locked successfully.");
         let mut library = library.unwrap();
 
         let subject_ids: Vec<i32> = library.iter().map(|series| {
@@ -195,6 +196,8 @@ impl LibraryApp {
                 let status = retry::retry(retry::delay::Fixed::from_millis(1000).take(5), || {
                     get_bangumi_episode_collection_status(subject_id)
                 }).unwrap();
+                // Pop "Special" episodes from status, keep only main episodes
+                // let status: Vec<BangumiEpisodeCollection> = status.into_iter().filter(|s| s.ep_type == MainStory).collect();
                 tx.send((subject_id, status)).unwrap();
             })
         }).collect();
@@ -212,7 +215,7 @@ impl LibraryApp {
             log::debug!("Library lock poisoned: {:?}", e);
             return true;
         }
-        log::debug!("Library locked successfully.");
+        log::debug!("(fetch_bangumi_watch_status) Library locked successfully.");
         let mut library = library.unwrap();
         log::debug!("Library get.");
 
@@ -234,12 +237,12 @@ impl LibraryApp {
                             // Match an EPISODE's sort in the SEASON with disp_episode_num - season's tmdb_episode_offset + bangumi_episode_offset
                             let episode_sort = (episode.disp_episode_num - season.conf_tmdb_episode_offset + season.conf_bangumi_episode_offset).to_string();
                             for s in status.iter() {
-                                if s.sort == episode_sort {
-                                    episode.bangumi_sort = s.sort.clone();
+                                if s.sort == episode_sort && s.ep_type == episode.bangumi_ep_type {
+                                    // episode.bangumi_sort = s.sort.clone();
                                     episode.bangumi_airdate = s.airdate.clone();
                                     episode.bangumi_name = s.name.clone();
                                     episode.bangumi_name_cn = s.name_cn.clone();
-                                    episode.bangumi_ep_type = s.ep_type.clone();
+                                    // episode.bangumi_ep_type = s.ep_type.clone();
                                     episode.bangumi_status = s.status.clone();
                                 }
                             }
