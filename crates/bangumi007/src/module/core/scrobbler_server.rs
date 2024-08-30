@@ -18,7 +18,7 @@ use crate::ui::apps::libraryapp::BANGUMI_STATUS_UPDATE;
 
 
 pub(crate) async fn http_main() {
-    let listener = TcpListener::bind("127.0.0.1:8007").await.unwrap();
+    let listener = TcpListener::bind("0.0.0.0:8007").await.unwrap();
     listener
         .incoming()
         .for_each_concurrent(/* limit */ None, |stream| async move {
