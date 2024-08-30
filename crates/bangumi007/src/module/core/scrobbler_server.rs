@@ -103,6 +103,7 @@ async fn handle_connection(mut stream: TcpStream) {
         let response = "HTTP/1.1 404 Not Found\r\n\r\n";
         stream.write(response.as_bytes()).await.unwrap();
         stream.flush().await.unwrap();
+        return;
     }
     let seasoninfo = seasoninfo.unwrap();
 
