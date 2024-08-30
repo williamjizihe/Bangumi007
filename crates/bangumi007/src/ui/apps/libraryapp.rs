@@ -32,9 +32,13 @@ impl LibraryApp {
             for season in &series.seasons {
                 ui.add_space(8.);
                 ui.horizontal(|ui| {
+                    // replace mikanani.me with mikanime.tv
+                    let image_url = season.disp_thumbnail_url.clone()
+                        .replace("mikanime.tv", "mikanani.me")
+                        .replace("bangumi", "Bangumi");
                     let season_image = ui.add_sized(
                         [51., 68.],
-                        egui::Image::new(season.disp_thumbnail_url.clone())
+                        egui::Image::new(image_url)
                             // egui::Image::new(egui::include_image!("../../../../../assets/150775.jpg"))
                             .show_loading_spinner(true)
                             .rounding(5.),
