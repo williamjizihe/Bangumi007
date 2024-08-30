@@ -216,6 +216,12 @@ impl LibraryApp {
         let mut library = library.unwrap();
         log::debug!("Library get.");
 
+        if library.is_empty() {
+            log::debug!("Library is empty.");
+            drop(library);
+            return false;
+        }
+
         let mut count = 0;
         for (subject_id, status) in rx.iter() {
             log::debug!("Subject ID: {}", subject_id);
