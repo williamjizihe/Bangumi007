@@ -1,4 +1,5 @@
 use std::sync::RwLock;
+use std::fs;
 
 use lazy_static::lazy_static;
 use rusqlite::Connection;
@@ -31,6 +32,11 @@ lazy_static! {
 
 #[deny(dead_code)]
 pub fn init_database() -> Result<(), Box<dyn std::error::Error>> {
+    let database_dir = std::path::Path::new("data/database");
+    if !database_dir.exists() {
+        fs::create_dir_all(database_dir)?;
+    }
+
     let conn = Connection::open(DATABASE_PATH)?;
     init_cache_mikan_item_table(&conn)?;
     init_cache_mikan_subject_table(&conn)?;
