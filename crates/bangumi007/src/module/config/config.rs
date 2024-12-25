@@ -118,6 +118,10 @@ impl AppConfig {
         // If parse error, backup the old file and make a new one with default values
         match std::fs::read_to_string("./data/config/app_config.toml") {
             Err(_) => {
+                std::fs::create_dir_all("./data/config").unwrap_or_else(|err| {
+                    panic!("Failed to create config directory: {}", err);
+                });
+                
                 let default_config = AppConfig::default();
                 std::fs::write("./data/config/app_config.toml", toml::to_string(&default_config).unwrap()).unwrap();
                 if default_config.first_run {
